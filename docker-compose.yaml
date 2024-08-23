@@ -7,23 +7,24 @@ services:
       - "3000:3000"
     volumes:
       - .:/usr/src/app
-#     environment:
-#       - MONGODB_URL=mongodb://admin:password@mongo:27017/HSM?authSource=admin
-#       - JWT_SECRET=123
-#     depends_on:
-#       - mongo
+    environment:
+      - MONGODB_URL=mongodb://admin:password@mongo:27017/guardian?authSource=admin
+      - JWT_SECRET=123
+    depends_on:
+      - mongo
 
-#   mongo:
-#     image: mongo
-#     container_name: guardian-backend_management_mongo
-#     ports:
-#       - "27017:27017"
-#     environment:
-#       - MONGO_INITDB_ROOT_USERNAME=admin
-#       - MONGO_INITDB_ROOT_PASSWORD=password
-#       - MONGO_INITDB_DATABASE=HSM
-#     volumes:
-#       - mongo_data:/data/db
+  mongo:
+    image: mongo
+    container_name: guardian-backend_management_mongo
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+      - MONGO_INITDB_DATABASE=guardian
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d  
 
-# volumes:
-#   mongo_data:
+volumes:
+  mongo_data:

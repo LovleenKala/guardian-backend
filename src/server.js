@@ -1,9 +1,23 @@
 require('dotenv').config();
 const express = require('express');
+const mongoose = require('./config/db');  
 const app = express();
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+
+const userRoutes = require('./routes/user');
+const wifiCSIRoutes = require('./routes/wifiCSI');
+const activityRecognitionRoutes = require('./routes/activityRecognition');
+const alertsRoutes = require('./routes/alerts');
+
+app.use('/api/users', userRoutes);
+app.use('/api/wifi-csi', wifiCSIRoutes);
+app.use('/api/activity-recognition', activityRecognitionRoutes);
+app.use('/api/alerts', alertsRoutes);
+
+// Test route
 app.get('/api', (req, res) => {
   res.json({ message: 'API works' });
 });
