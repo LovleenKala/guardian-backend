@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const ActivityRecognition = require('../models/ActivityRecognition');
+const verifyToken = require('../middleware/verifyToken'); // Import the JWT middleware
 
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
     const newActivity = new ActivityRecognition({
-      user_id: req.body.user_id,
+      user_id: req.user._id,
       wifi_csi_id: req.body.wifi_csi_id,
       activity_type: req.body.activity_type,
       confidence: req.body.confidence,
@@ -18,7 +19,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
     const activities = await ActivityRecognition.find();
     res.status(200).json(activities);
