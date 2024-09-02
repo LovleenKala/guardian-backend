@@ -1,16 +1,12 @@
-# guardian-backend
-This repository hosts the source code for the Guardian backend API.
-
-To update the README file with the changes from PostgreSQL to MongoDB, and reflecting the new endpoints and authentication details, here's the revised content:
+### Updated `README.md`:
 
 ```markdown
 # Guardian System Management API
 
-The guardian system Management API provides functionalities 
-
+The Guardian System Management API provides functionalities for managing user data
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
+These instructions will help you get a copy of the project up and running on your local machine for development and testing purposes.
 
 ### Prerequisites
 
@@ -23,7 +19,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 1. Clone the repository to your local machine:
    ```bash
-   git clone  https://github.com/Gopher-Industries/guardian-backend.git
+   git clone https://github.com/Gopher-Industries/guardian-backend.git
    ```
 
 2. Navigate into the project directory:
@@ -40,6 +36,7 @@ These instructions will get you a copy of the project up and running on your loc
    MONGODB_URL=mongodb://localhost:27017/guardian
    PORT=3000
    NODE_ENV=development
+   JWT_SECRET=your_jwt_secret_key
    ```
 
 4. Start the application with Docker:
@@ -64,10 +61,11 @@ guardian-backend/
 │   ├── Alert.js
 │   └── Notification.js
 ├── routes/               # API route handlers
-│   ├── user.js
-│   ├── wifiCSI.js
-│   ├── activityRecognition.js
-│   └── alerts.js
+│   ├── auth.js           # Authentication routes (register, login, protected routes)
+│   ├── user.js           # User routes (protected by JWT)
+│   ├── wifiCSI.js        # Wi-Fi CSI routes (protected by JWT)
+│   ├── activityRecognition.js # Activity recognition routes (protected by JWT)
+│   └── alerts.js         # Alerts routes (protected by JWT)
 ├── .env                  # Environment variables
 ├── server.js             # Main server file
 └── package.json          # Dependencies and scripts
@@ -75,25 +73,34 @@ guardian-backend/
 
 ### API Endpoints
 
+#### Authentication
+
+- **POST** `/api/auth/register` - Register a new user
+- **POST** `/api/auth/login` - Login a user and receive a JWT token
+- **GET** `/api/auth/me` - Get the authenticated user's information (requires JWT token)
+
 #### User Management
 
-- **POST** `/api/users` - Create a new user
-- **GET** `/api/users` - Get all users
+- **GET** `/api/users` - Get all users (requires JWT token)
 
 #### Wi-Fi CSI Data Management
 
-- **POST** `/api/wifi-csi` - Create a new Wi-Fi CSI record
-- **GET** `/api/wifi-csi` - Get all Wi-Fi CSI records
+- **POST** `/api/wifi-csi` - Create a new Wi-Fi CSI record (requires JWT token)
+- **GET** `/api/wifi-csi` - Get all Wi-Fi CSI records (requires JWT token)
 
 #### Activity Recognition
 
-- **POST** `/api/activity-recognition` - Create a new activity recognition record
-- **GET** `/api/activity-recognition` - Get all activity recognition records
+- **POST** `/api/activity-recognition` - Create a new activity recognition record (requires JWT token)
+- **GET** `/api/activity-recognition` - Get all activity recognition records (requires JWT token)
 
 #### Alerts and Notifications
 
-- **POST** `/api/alerts` - Create a new alert
-- **GET** `/api/alerts` - Get all alerts
+- **POST** `/api/alerts` - Create a new alert (requires JWT token)
+- **GET** `/api/alerts` - Get all alerts (requires JWT token)
+
+### Authentication
+
+This API uses JWT (JSON Web Tokens) for securing routes. The token is issued upon successful login and must be included in the `x-auth-token` header of requests to protected routes.
 
 ### Testing
 
@@ -101,38 +108,32 @@ To test the API, use Postman or similar API testing tools.
 
 1. **Start the server** using the Docker Compose command mentioned above.
 2. **Use Postman** to send HTTP requests to the API endpoints. Examples:
-   - **POST** `/api/users`
-   - **GET** `/api/users`
-   - **POST** `/api/wifi-csi`
-   - **GET** `/api/wifi-csi`
-   - **POST** `/api/activity-recognition`
-   - **GET** `/api/activity-recognition`
-   - **POST** `/api/alerts`
-   - **GET** `/api/alerts`
+   - **POST** `/api/auth/register` - Register a new user.
+   - **POST** `/api/auth/login` - Log in to get a JWT token.
+   - **GET** `/api/auth/me` - Access a protected route using the JWT token.
+   - **GET** `/api/users` - Access the users' list using the JWT token.
 
 ### Environment Variables
 
 - `MONGODB_URL`: The MongoDB connection string.
 - `PORT`: The port on which the application runs (default: 3000).
 - `NODE_ENV`: The environment in which the app is running (e.g., `development`).
+- `JWT_SECRET`: The secret key used to sign JWT tokens.
 
 ### Built With
 
 - **Node.js** - The runtime environment
 - **Express** - The web framework used
 - **Mongoose** - MongoDB object modeling for Node.js
+- **JWT** - JSON Web Token for secure authentication
 - **Docker** - Containerization for the application
 
 
-### Acknowledgments
-
-- Special thanks to the development team and contributors.
-
 ```
 
-### What’s Covered:
-- **Project Setup**: Instructions for cloning, setting up environment variables, and running the project.
-- **Project Structure**: Explanation of how the files and directories are organized.
-- **API Endpoints**: Overview of all the API routes and their functionality.
-- **Testing**: Instructions on how to test the API using Postman.
-- **Environment Variables**: Key configurations like MongoDB URL and PORT.
+### Summary of Updates:
+
+- **Added JWT Authentication**: Explained the JWT implementation and how to use it with the API.
+- **Updated Project Structure**: Included the new `auth.js` route and the integration of JWT in the `user.js`, `wifiCSI.js`, `activityRecognition.js`, and `alerts.js` routes.
+- **Detailed API Endpoints**: Provided information on how to use the authentication endpoints and access protected routes.
+- **Environment Variables**: Added the `JWT_SECRET` key to the list of environment variables.
