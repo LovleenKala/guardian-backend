@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  db:
+    image: mysql:latest
+    container_name: csi_database
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password  # Replace with a secure root password
+      MYSQL_DATABASE: csidata              # The name of the database to create
+      MYSQL_USER: user                    # Replace with your desired user
+      MYSQL_PASSWORD: user_password       # Replace with your desired user password
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./sql-scripts:/docker-entrypoint-initdb.d  # Mounting the directory for SQL scripts
+    networks:
+      - csi_network
+
+networks:
+  csi_network:
+    driver: bridge
