@@ -39,12 +39,17 @@ These instructions will help you get a copy of the project up and running on you
    JWT_SECRET=your_jwt_secret_key
    ```
 
-4. Start the application with Docker:
+4. You might need to install the `dotenv` package:
+   ```bash
+   npm install dotenv
+   ```
+
+5. Start the application with Docker:
    ```bash
    docker-compose up --build
    ```
 
-5. The API will be available at `http://localhost:3000`.
+6. The API will be available at `http://localhost:3000`.
 
 ### Project Structure
 
