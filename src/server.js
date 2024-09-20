@@ -16,11 +16,20 @@ const userRoutes = require('./routes/user');
 const wifiCSIRoutes = require('./routes/wifiCSI');
 const activityRecognitionRoutes = require('./routes/activityRecognition');
 const alertsRoutes = require('./routes/alerts');
+const roleRoutes = require('./routes/role');
+const adminRoutes = require('./routes/admin'); 
+const checkUserRoleRoutes = require('./routes/checkUserRole'); 
+
+
 
 app.use('/api/users', userRoutes);
 app.use('/api/wifi-csi', wifiCSIRoutes);
 app.use('/api/activity-recognition', activityRecognitionRoutes);
 app.use('/api/alerts', alertsRoutes);
+app.use('/api', roleRoutes);
+app.use('/api/admin', adminRoutes); 
+app.use('/api', checkUserRoleRoutes); 
+
 
 // Test route
 app.get('/api', (req, res) => {
