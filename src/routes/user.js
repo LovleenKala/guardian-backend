@@ -6,6 +6,35 @@ const User = require('../models/User');
 const verifyToken = require('../middleware/verifyToken');
 const checkPasswordExpiry = require('../middleware/checkPasswordExpiry');
 
+/**
+ * @swagger
+ * /api/users/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *               - password
+ *             properties:
+ *               username:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *       400:
+ *         description: Error creating user
+ */
 router.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -38,7 +67,32 @@ router.post('/register', async (req, res) => {
   }
 });
 
-
+/**
+ * @swagger
+ * /api/users/login:
+ *   post:
+ *     summary: User login
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successful login
+ *       400:
+ *         description: Invalid credentials
+ */
 router.post('/login', async (req, res) => {
   try {
     const user = await User.findOne({ email: req.body.email });
@@ -92,7 +146,37 @@ router.post('/login', async (req, res) => {
   }
 });
 
-
+/**
+ * @swagger
+ * /api/users/change-password:
+ *   post:
+ *     summary: Change user password
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - oldPassword
+ *               - newPassword
+ *               - confirmPassword
+ *             properties:
+ *               oldPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *               confirmPassword:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *       400:
+ *         description: Error changing password
+ */
 router.post('/change-password', verifyToken, async (req, res) => {
   try {
     const { oldPassword, newPassword, confirmPassword } = req.body;
@@ -131,7 +215,29 @@ router.post('/change-password', verifyToken, async (req, res) => {
   }
 });
 
-
+/**
+ * @swagger
+ * /api/users/reset-password-request:
+ *   post:
+ *     summary: Request password reset
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password reset link sent
+ *       400:
+ *         description: Error sending password reset link
+ */
 router.post('/reset-password-request', async (req, res) => {
   try {
     const { email } = req.body;
@@ -160,7 +266,25 @@ router.post('/reset-password-request', async (req, res) => {
   }
 });
 
-
+/**
+ * @swagger
+ * /api/users/reset-password:
+ *   get:
+ *     summary: Reset user password
+ *     tags: [Users]
+ *     parameters:
+ *       - in: query
+ *         name: token
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: JWT token for password reset
+ *     responses:
+ *       200:
+ *         description: Password reset form
+ *       400:
+ *         description: Invalid or expired token
+ */
 router.get('/reset-password', (req, res) => {
   const { token } = req.query;
 
@@ -178,7 +302,25 @@ router.get('/reset-password', (req, res) => {
   }
 });
 
-
+/**
+ * @swagger
+ * /api/users/reset-password:
+ *   get:
+ *     summary: Reset user password
+ *     tags: [Users]
+ *     parameters:
+ *       - in: query
+ *         name: token
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: JWT token for password reset
+ *     responses:
+ *       200:
+ *         description: Password reset form
+ *       400:
+ *         description: Invalid or expired token
+ */
 router.post('/reset-password', async (req, res) => {
   const { token, newPassword, confirmPassword } = req.body;
 
@@ -212,7 +354,24 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-
+/**
+ * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Get all users
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: A list of users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/User'
+ */
 router.get('/', verifyToken, checkPasswordExpiry, async (req, res) => {
   try {
     const users = await User.find().select('-password_hash');
