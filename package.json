@@ -12,6 +12,7 @@
     "express": "^4.19.2",
     "express-oas-generator": "^1.0.46",
     "fastify": "^4.28.1",
+    "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^5.13.22",
     "nodemon": "^3.1.7",
