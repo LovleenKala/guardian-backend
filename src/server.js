@@ -4,6 +4,7 @@ const express = require('express');
 const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
+const database = require('./config/db');
 const app = express();
 const swaggerOptions = {
   definition: {
@@ -14,9 +15,22 @@ const swaggerOptions = {
       description: 'API documentation with Swagger UI and Redoc'
     }
   },
-  apis: ['./src/routes/*.js']
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+    },
+  },
+  security: [
+    {
+      bearerAuth: [], // Apply globally to all endpoints
+    },
+  ],
+  apis: ['./src/routes/*.js','./src/routes/**/*.js', './src/controllers/*.js'],  // Add the controllers path here
 };
-
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
@@ -28,31 +42,18 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-
-const userRoutes = require('./routes/user');
 const wifiCSIRoutes = require('./routes/wifiCSI');
 const activityRecognitionRoutes = require('./routes/activityRecognition');
 const alertsRoutes = require('./routes/alerts');
-const roleRoutes = require('./routes/role');
-const adminRoutes = require('./routes/admin'); 
-const checkUserRoleRoutes = require('./routes/checkUserRole'); 
+const nurseRoutes = require('./routes/nurseRoutes'); // Import nurse routes
 
+app.use('/api/v1/wifi-csi', wifiCSIRoutes);
+app.use('/api/v1/activity-recognition', activityRecognitionRoutes);
+app.use('/swaggerDocs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api/v1/alerts', alertsRoutes);
+app.use("/api/v2/nurse", nurseRoutes);
 
-app.use('/api/users', userRoutes);
-app.use('/api/wifi-csi', wifiCSIRoutes);
-app.use('/api/activity-recognition', activityRecognitionRoutes);
-app.use('/api/alerts', alertsRoutes);
-app.use('/api', roleRoutes);
-app.use('/api/admin', adminRoutes); 
-app.use('/api', checkUserRoleRoutes); 
-app.use('/docs2', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-app.use("/api/v1/admin", adminRoutes);
-app.use("/api/v1/caretaker", adminRoutes);
-app.use("/api/v1/nurse", adminRoutes);
-
-
-app.get('/docs1', (req, res) => {
+app.get('/redoc', (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html>
@@ -73,6 +74,65 @@ app.get('/docs1', (req, res) => {
 
 app.get('/openapi.json', (req, res) => {
   res.sendFile(path.join(__dirname, 'openapi.json'));
+});
+
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="X-UA-Compatible" content="ie=edge">
+      <title>Guardian API Documentation</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          background-color: #f4f4f4;
+        }
+        .container {
+          text-align: center;
+        }
+        h1 {
+          color: #333;
+        }
+        .button-container {
+          margin-top: 20px;
+        }
+        .button {
+          background-color: #4CAF50; /* Green */
+          border: none;
+          color: white;
+          padding: 15px 32px;
+          text-align: center;
+          text-decoration: none;
+          display: inline-block;
+          font-size: 16px;
+          margin: 10px;
+          cursor: pointer;
+          border-radius: 8px;
+          transition: background-color 0.3s ease;
+        }
+        .button:hover {
+          background-color: #45a049;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>Welcome to Guardian API. Read Our docs</h1>
+        <div class="button-container">
+          <a href="/swaggerDocs" class="button">Swagger UI Docs</a>
+          <a href="/redoc" class="button">Redoc Docs</a>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
 });
 
 const PORT = process.env.PORT || 3000;
