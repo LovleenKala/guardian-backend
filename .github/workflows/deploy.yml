@@ -30,4 +30,4 @@ jobs:
 
         run: |
           echo "Connecting to MongoDB at $MONGODB_URL" # Optional: Log for debugging
-          node index.js # Replace 'index.js' with the entry point of your app
+          node server.js # Replace 'index.js' with the entry point of your app
