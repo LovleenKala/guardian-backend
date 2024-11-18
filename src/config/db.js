@@ -3,7 +3,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const seedRoles = require('../seedRoles');
 
-const mongoDBUrl = process.env.MONGODB_URL;
+const mongoDBUrl = process.env.MONGODB_URL || "mongodb://mongo:TTIDqLOFFZHpnBqXQOSkYTZCjHnlkytZ@autorack.proxy.rlwy.net:28357";
 
 mongoose.set("strictQuery", false);
 mongoose.connect(mongoDBUrl, {
@@ -19,3 +19,4 @@ mongoose.connect(mongoDBUrl, {
   .catch(err => console.error('MongoDB connection error:', err));
 
 module.exports = mongoose;
+
