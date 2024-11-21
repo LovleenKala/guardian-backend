@@ -216,6 +216,10 @@ exports.login = async (req, res) => {
  *         description: Internal server error. Error processing the request.
  */
 exports.sendOTP = async (req, res) => {
+    // Temporary bypass for OTP
+    return res.status(200).json({ message: 'OTP functionality is temporarily disabled for testing.' });
+
+    // Original OTP logic (inactive due to the testing )
   const { email } = req.body;
 
   if (!email) {
@@ -282,6 +286,10 @@ exports.sendOTP = async (req, res) => {
  *         description: Internal server error. Error processing the request.
  */
 exports.verifyOTP = async (req, res) => {
+    // Temporary bypass for OTP verification
+    return res.status(200).json({ message: 'OTP verification bypassed for testing.' });
+
+    // Original OTP verification logic (inactive due to testing)
   const { email, otp } = req.body;
 
   if (!email || !otp) {
