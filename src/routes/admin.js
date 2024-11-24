@@ -55,5 +55,7 @@ router.get('/caretakers', verifyToken, verifyRole(['admin']), async (req, res) =
 
 // Patient Overview API
 router.get('/patients/:patientId', verifyToken, verifyRole(['admin']), adminController.getPatientOverview);
+// Support Tickets APIs
+router.post('/support-tickets', verifyToken, adminController.createSupportTicket);
 
 module.exports = router;
