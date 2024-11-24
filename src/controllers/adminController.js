@@ -57,3 +57,20 @@ exports.createSupportTicket = async (req, res) => {
   }
 };
 
+// Fetch all support tickets
+exports.getSupportTickets = async (req, res) => {
+  try {
+    const { status, userId } = req.query;
+
+    const query = {};
+    if (status) query.status = status;
+    if (userId) query.user = userId;
+
+    const tickets = await SupportTicket.find(query).populate('user');
+    res.status(200).json(tickets);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching support tickets', details: error.message });
+  }
+};
+
+
