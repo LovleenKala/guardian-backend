@@ -58,5 +58,6 @@ router.get('/patients/:patientId', verifyToken, verifyRole(['admin']), adminCont
 // Support Tickets APIs
 router.post('/support-tickets', verifyToken, adminController.createSupportTicket);
 router.get('/support-tickets', verifyToken, verifyRole(['admin']), adminController.getSupportTickets);
+router.put('/support-tickets/:ticketId', verifyToken, verifyRole(['admin']), adminController.updateSupportTicket);
 
 module.exports = router;
