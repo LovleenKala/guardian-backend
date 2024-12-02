@@ -237,9 +237,53 @@ exports.updateSupportTicket = async (req, res) => {
   }
 };
 
-const Task = require('../models/Task');
-
-// Create a new task
+/**
+ * @swagger
+ * /api/v1/admin/tasks:
+ *   post:
+ *     summary: Create a new task
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - description
+ *               - patientId
+ *               - dueDate
+ *               - assignedTo
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               patientId:
+ *                 type: string
+ *                 description: ID of the patient to whom the task is assigned
+ *               dueDate:
+ *                 type: string
+ *                 format: date
+ *               assignedTo:
+ *                 type: string
+ *                 description: ID of the user (caretaker or nurse) assigned to the task
+ *     responses:
+ *       201:
+ *         description: Task created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 task:
+ *                   $ref: '#/components/schemas/Task'
+ *       500:
+ *         description: Error creating task
+ */
 exports.createTask = async (req, res) => {
   try {
     const { title, description, patientId, dueDate, assignedTo } = req.body;
@@ -253,7 +297,52 @@ exports.createTask = async (req, res) => {
   }
 };
 
-// Update a task
+/**
+ * @swagger
+ * /api/v1/admin/tasks/{taskId}:
+ *   put:
+ *     summary: Update a task
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: taskId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the task to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               dueDate:
+ *                 type: string
+ *                 format: date
+ *               assignedTo:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Task updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 task:
+ *                   $ref: '#/components/schemas/Task'
+ *       404:
+ *         description: Task not found
+ *       500:
+ *         description: Error updating task
+ */
 exports.updateTask = async (req, res) => {
   try {
     const { taskId } = req.params;
@@ -271,7 +360,34 @@ exports.updateTask = async (req, res) => {
   }
 };
 
-// Delete a task
+/**
+ * @swagger
+ * /api/v1/admin/tasks/{taskId}:
+ *   delete:
+ *     summary: Delete a task
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: taskId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the task to delete
+ *     responses:
+ *       200:
+ *         description: Task deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       404:
+ *         description: Task not found
+ *       500:
+ *         description: Error deleting task
+ */
 exports.deleteTask = async (req, res) => {
   try {
     const { taskId } = req.params;
