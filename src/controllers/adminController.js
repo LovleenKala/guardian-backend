@@ -37,3 +37,23 @@ exports.getPatientOverview = async (req, res) => {
     res.status(500).json({ message: 'Error fetching patient overview', details: error.message });
   }
 };
+
+// Create a support ticket
+exports.createSupportTicket = async (req, res) => {
+  try {
+    const { subject, description, status } = req.body;
+
+    const newTicket = new SupportTicket({
+      user: req.user._id,
+      subject,
+      description,
+      status: status || 'open',
+    });
+
+    await newTicket.save();
+    res.status(201).json({ message: 'Support ticket created', ticket: newTicket });
+  } catch (error) {
+    res.status(500).json({ message: 'Error creating support ticket', details: error.message });
+  }
+};
+
