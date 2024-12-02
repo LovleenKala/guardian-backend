@@ -60,4 +60,9 @@ router.post('/support-tickets', verifyToken, adminController.createSupportTicket
 router.get('/support-tickets', verifyToken, verifyRole(['admin']), adminController.getSupportTickets);
 router.put('/support-tickets/:ticketId', verifyToken, verifyRole(['admin']), adminController.updateSupportTicket);
 
+// Task Management APIs
+router.post('/tasks', verifyToken, verifyRole(['admin']), adminController.createTask);
+router.put('/tasks/:taskId', verifyToken, verifyRole(['admin']), adminController.updateTask);
+router.delete('/tasks/:taskId', verifyToken, verifyRole(['admin']), adminController.deleteTask);
+
 module.exports = router;
