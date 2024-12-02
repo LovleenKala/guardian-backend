@@ -3,6 +3,7 @@ const HealthRecord = require('../models/HealthRecord');
 const Task = require('../models/Task');
 const CarePlan = require('../models/CarePlan');
 const SupportTicket = require('../models/SupportTicket');
+const Task = require('../models/Task');
 
 /**
  * @swagger
@@ -169,5 +170,69 @@ exports.getSupportTickets = async (req, res) => {
     res.status(200).json(tickets);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching support tickets', details: error.message });
+  }
+};
+
+/**
+ * @swagger
+ * /api/v1/admin/support-ticket/{ticketId}:
+ *   put:
+ *     summary: Update a support ticket
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: ticketId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the support ticket to be updated
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 description: New status of the support ticket (e.g., open, closed)
+ *               adminResponse:
+ *                 type: string
+ *                 description: Response or comments from the admin
+ *     responses:
+ *       200:
+ *         description: Support ticket updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 ticket:
+ *                   $ref: '#/components/schemas/SupportTicket'
+ *       404:
+ *         description: Support ticket not found
+ *       500:
+ *         description: Error updating support ticket
+ */
+exports.updateSupportTicket = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { status, adminResponse } = req.body;
+
+    const updatedTicket = await SupportTicket.findByIdAndUpdate(
+      ticketId,
+      { status, adminResponse },
+      { new: true }
+    );
+
+    if (!updatedTicket) {
+      return res.status(404).json({ message: 'Support ticket not found' });
+    }
+
+    res.status(200).json({ message: 'Support ticket updated', ticket: updatedTicket });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating support ticket', details: error.message });
   }
 };
