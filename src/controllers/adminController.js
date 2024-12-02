@@ -73,4 +73,24 @@ exports.getSupportTickets = async (req, res) => {
   }
 };
 
+// Update a support ticket
+exports.updateSupportTicket = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { status, adminResponse } = req.body;
 
+    const updatedTicket = await SupportTicket.findByIdAndUpdate(
+      ticketId,
+      { status, adminResponse },
+      { new: true }
+    );
+
+    if (!updatedTicket) {
+      return res.status(404).json({ message: 'Support ticket not found' });
+    }
+
+    res.status(200).json({ message: 'Support ticket updated', ticket: updatedTicket });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating support ticket', details: error.message });
+  }
+};
