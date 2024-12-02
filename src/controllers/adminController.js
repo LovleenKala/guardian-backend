@@ -236,3 +236,54 @@ exports.updateSupportTicket = async (req, res) => {
     res.status(500).json({ message: 'Error updating support ticket', details: error.message });
   }
 };
+
+const Task = require('../models/Task');
+
+// Create a new task
+exports.createTask = async (req, res) => {
+  try {
+    const { title, description, patientId, dueDate, assignedTo } = req.body;
+
+    const newTask = new Task({ title, description, patient: patientId, dueDate, assignedTo });
+    await newTask.save();
+
+    res.status(201).json({ message: 'Task created successfully', task: newTask });
+  } catch (error) {
+    res.status(500).json({ message: 'Error creating task', details: error.message });
+  }
+};
+
+// Update a task
+exports.updateTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const updateData = req.body;
+
+    const updatedTask = await Task.findByIdAndUpdate(taskId, updateData, { new: true });
+
+    if (!updatedTask) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    res.status(200).json({ message: 'Task updated successfully', task: updatedTask });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating task', details: error.message });
+  }
+};
+
+// Delete a task
+exports.deleteTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+
+    const deletedTask = await Task.findByIdAndDelete(taskId);
+
+    if (!deletedTask) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    res.status(200).json({ message: 'Task deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting task', details: error.message });
+  }
+};
