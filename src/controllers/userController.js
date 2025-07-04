@@ -154,7 +154,7 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       { _id: user._id, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '24h' }
     );
 
     const currentDate = new Date();
@@ -173,7 +173,8 @@ exports.login = async (req, res) => {
       lastPasswordChange: user.lastPasswordChange,
       created_at: user.created_at,
       updated_at: user.updated_at,
-      role: userRole.name
+      role: userRole.name,
+      twoFactorRequired: userRole.name.toLowerCase() !== 'nurse' // Add twoFactorRequired field
     };
 
     const response = { user: userResponse, token };
