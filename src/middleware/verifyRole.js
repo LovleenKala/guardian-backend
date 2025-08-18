@@ -1,22 +1,52 @@
+'use strict';
+
+const AppError = require('../utils/appError');
 const User = require('../models/User');
 
-// Middleware to verify if the user has the required role
-const verifyRole = (roles) => async (req, res, next) => {
+// Usage: verifyRole(['admin']) or verifyRole(['admin','nurse'])
+const verifyRole = (allowedRoles = []) => async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id).populate('role');
-    if (!user || !user.role || !user.role.name) {
-      return res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
+    // verifyToken must have run already
+    const uid = req.user?._id;
+    if (!uid) {
+      return next(new AppError(401, 'Unauthorized', 'No authenticated user', {
+        type: 'https://docs.api/errors/unauthorized',
+        code: 'NO_USER'
+      }));
     }
 
-    const userRole = await user.role.name;
-    if (!roles.includes(userRole)) {
-      return res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
+    // Load user once to confirm existence & current role
+    const user = await User.findById(uid).lean();
+    if (!user) {
+      return next(new AppError(401, 'Unauthorized', 'Authenticated user not found', {
+        type: 'https://docs.api/errors/unauthorized',
+        code: 'NO_USER_DB'
+      }));
     }
 
-    next();
-  } catch (error) {
-    console.error('Error verifying user role:', error);
-    res.status(500).json({ message: 'Failed to check user role' });
+    // Currently roles are stored as a string (e.g., 'admin')
+    // If ever switched to refs, this will handle both:
+    const roleName = (typeof user.role === 'string') ? user.role : (user.role?.name || null);
+
+    if (!roleName || !allowedRoles.includes(roleName)) {
+      return next(new AppError(403, 'Forbidden', 'Insufficient permissions', {
+        type: 'https://docs.api/errors/forbidden',
+        code: 'INSUFFICIENT_ROLE',
+        meta: { required: allowedRoles, actual: roleName || null }
+      }));
+    }
+
+    // Enforce isApproved for admin surfaces
+    if (roleName === 'admin' && user.isApproved === false) {
+      return next(new AppError(403, 'Forbidden', 'Admin not approved', {
+        type: 'https://docs.api/errors/forbidden',
+        code: 'ADMIN_NOT_APPROVED'
+       }));
+    }
+
+    return next();
+  } catch (err) {
+    return next(err);
   }
 };
 
