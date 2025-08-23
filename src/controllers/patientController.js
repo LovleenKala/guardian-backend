@@ -1,353 +1,239 @@
+const { isValidObjectId, Types } = require('mongoose');
 const Patient = require('../models/Patient');
-const User = require('../models/User');
-const EntryReport = require('../models/EntryReport');
+const Log = require('../models/Log');
+const asyncHandler = require('../utils/asyncHandler');
+const AppError = require('../utils/appError');
 
+const { ADMIN_ROSTER_PROJECTION, PATIENT_SELF_PROJECTION } = require('../models/Patient');
+
+// For lists shown to nurses/caretakers (no clinical details)
+const PATIENT_LIST_PROJECTION =
+  'fullName org assignedNurse assignedCaretaker admittedAt createdAt updatedAt';
+
+// --- helpers ---------------------------------------------------------------
+
+async function loadPatientOr404(patientId) {
+  if (!patientId || !isValidObjectId(patientId)) {
+    throw new AppError(400, 'Invalid patientId');
+  }
+  const patient = await Patient.findById(patientId);
+  if (!patient) throw new AppError(404, 'Patient not found');
+  return patient;
+}
+
+function assertAssignedOrThrow(user, patient) {
+  const uid = String(user._id);
+  const nurse = patient.assignedNurse ? String(patient.assignedNurse) : null;
+  const caretaker = patient.assignedCaretaker ? String(patient.assignedCaretaker) : null;
+  if (uid !== nurse && uid !== caretaker) {
+    throw new AppError(403, 'You are not assigned to this patient');
+  }
+}
+
+// --- create patient (freelancers only via middleware) ---------------------
 
 /**
- * @swagger
- * /api/v1/patients/add:
- *   post:
- *     summary: Add a new patient with profile photo
- *     tags: [Patient]
- *     security:
- *       - bearerAuth: []
- *     consumes:
- *       - multipart/form-data
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required:
- *               - fullname
- *               - dateOfBirth
- *               - gender
- *             properties:
- *               fullname:
- *                 type: string
- *               dateOfBirth:
- *                 type: String
- *                 format: date
- *                 example: '1980-01-01'
- *               gender:
- *                 type: string
- *               profilePhoto:
- *                 type: string
- *                 format: binary
- *     responses:
- *       201:
- *         description: Patient added successfully
- *       400:
- *         description: Error adding patient
+ * POST /patients
+ * Freelancers (nurse/caretaker with org === null) auto-assign themselves.
  */
-exports.addPatient = async (req, res) => {
-  try {
-    const { fullname, dateOfBirth, gender } = req.body;
-    const caretakerId = req.user._id; // Extracted from the token middleware
+exports.createPatient = asyncHandler(async (req, res) => {
+  const {
+    fullName,
+    dateOfBirth,
+    guardian,
+    emergencyContact,
+    medicalSummary,
+    description,
+    photoUrl,
+    admittedAt,
+    org, // should be null for freelancers via middleware, but allow explicit null
+    user, // optional link to a new/existing user account
+  } = req.body || {};
 
-    if (!fullname || !dateOfBirth || !gender) {
-      return res.status(400).json({ message: 'Missing required fields' });
+  if (!fullName || !dateOfBirth) {
+    throw new AppError(400, 'fullName and dateOfBirth are required');
+  }
+
+  const doc = await Patient.create({
+    fullName,
+    dateOfBirth,
+    guardian,
+    emergencyContact,
+    medicalSummary,
+    description,
+    photoUrl,
+    admittedAt: admittedAt || undefined,
+    org: org || null,
+    assignedNurse: null,
+    assignedCaretaker: null,
+    user: user || undefined,
+  });
+
+  // Auto-assign if creator is a freelancer
+  if (!req.user.org) {
+    if (req.user.role === 'nurse') {
+      doc.assignedNurse = req.user._id;
+    } else if (req.user.role === 'caretaker') {
+      doc.assignedCaretaker = req.user._id;
     }
-
-    const newPatient = new Patient({
-      fullname,
-      dateOfBirth,
-      gender,
-      caretaker: caretakerId,
-      profilePhoto: req.file?.filename
-    });
-
-    await newPatient.save();
-    res.status(201).json({ message: 'Patient added successfully', patient: { ...newPatient.toObject(), age: calculateAge(newPatient.dateOfBirth) } });
-  } catch (err) {
-    res.status(400).json({ message: 'Error adding your patient', details: err.message });
   }
-};
+
+  // Persist any auto-assignment changes
+  await doc.save();
+
+  res.status(201).json({ message: 'Patient created', patient: doc });
+});
+
+// --- list assigned patients ----------------------------------------------
 
 /**
- * @swagger
- * /api/v1/patient/{patientId}:
- *   get:
- *     summary: Fetch patient details
- *     tags: [Patient]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - patientId
- *             properties:
- *               patientId:
- *                 type: string
- *     responses:
- *       200:
- *         description: Patient details
- *       404:
- *         description: Patient not found
- *       400:
- *         description: Error fetching patient details
+ * GET /patients/assigned
+ * Nurse/Caretaker (verifyRole enforces). Must be assigned to the patient.
  */
-exports.getPatientDetails = async (req, res) => {
-  try {
-    const patient = await Patient.findById(req.body.patientId)
-      .populate('caretaker', 'fullname email')
-      .populate('assignedNurses', 'fullname email');
+exports.listAssignedPatients = asyncHandler(async (req, res) => {
+  const { after, limit } = req.query;
 
-    if (!patient) return res.status(404).json({ message: 'Patient not found' });
-
-    const patientObj = patient.toObject(); // Convert Mongoose document to plain object
-
-    if (patientObj.dateOfBirth) {
-      patientObj.age = calculateAge(patientObj.dateOfBirth); // Dynamically add age
-    }
-
-    res.json(patientObj);
-  } catch (error) {
-    res.status(400).json({ message: 'Error fetching patient information', details: error.message });
+  if (req.user.role !== 'nurse' && req.user.role !== 'caretaker') {
+    throw new AppError(403, 'Only nurses or caretakers can view assigned patients');
   }
-};
+
+  const filter = {};
+  if (req.user.role === 'nurse') filter.assignedNurse = req.user._id;
+  if (req.user.role === 'caretaker') filter.assignedCaretaker = req.user._id;
+
+  if (after) {
+    if (!isValidObjectId(after)) throw new AppError(400, 'Invalid cursor');
+    filter._id = { $gt: new Types.ObjectId(after) };
+  }
+
+  const pageSize = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+
+  const items = await Patient.find(filter)
+    .select(PATIENT_LIST_PROJECTION)
+    .sort({ _id: 1 })
+    .limit(pageSize)
+    .lean();
+
+  const nextCursor = items.length ? items[items.length - 1]._id : null;
+  res.status(200).json({ items, nextCursor, limit: pageSize });
+});
+
+// --- Patient self-access ---------------------------------------------------
 
 /**
- * @swagger
- * /api/v1/patients/assign-nurse:
- *   post:
- *     summary: Assign a nurse to a patient
- *     tags: [Patient]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - nurseId
- *               - patientId
- *             properties:
- *               nurseId:
- *                 type: string
- *               patientId:
- *                 type: string
- *     responses:
- *       200:
- *         description: Nurse assigned successfully
- *       404:
- *         description: Invalid nurse or patient ID
- *       500:
- *         description: Server error
+ * GET /patients/me
+ * Patient can view *all* their own data (per your decision).
  */
-exports.assignNurseToPatient = async (req, res) => {
-  const { nurseId, patientId } = req.body;
+exports.getMyPatient = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'patient') throw new AppError(403, 'Only patients can access this endpoint');
 
-  try {
-    const patient = await Patient.findById(patientId);
-    const nurse = await User.findById(nurseId);
+  const me = await Patient.findOne({ user: req.user._id }).lean();
+  if (!me) throw new AppError(404, 'Patient record not found for this user');
 
-    if (!patient || !nurse) return res.status(404).json({ error: 'Invalid nurse or patient ID' });
-
-    patient.assignedNurses = patient.assignedNurses || [];
-    if (!patient.assignedNurses.includes(nurseId)) {
-      patient.assignedNurses.push(nurseId);
-      await patient.save();
-    }
-
-    res.status(200).json({ message: 'Nurse assigned to patient successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Error assigning nurse to patient', details: error.message });
-  }
-};
+  // For now, you allow full data; projection symbol kept for future narrowing
+  res.status(200).json({ patient: me });
+});
 
 /**
- * @swagger
- * /api/v1/patients/assigned-patients:
- *   get:
- *     summary: Fetch assigned patients for a nurse or caretaker
- *     tags: [Patient]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of assigned patients
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Patient'
- *       403:
- *         description: Unauthorized role
- *       500:
- *         description: Error fetching assigned patients
+ * GET /patients/me/logs
+ * Patient can view all logs for themselves.
  */
-exports.getAssignedPatients = async (req, res) => {
-  try {
-    // Get user from the DB and populate their role
-    const user = await User.findById(req.user._id).populate('role');
-    if (!user || !user.role || !user.role.name) {
-      return res.status(403).json({ message: 'Invalid or missing user role' });
-    }
+exports.getMyLogs = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'patient') throw new AppError(403, 'Only patients can access this endpoint');
 
-    const query = {};
-    if (user.role.name === 'nurse') {
-      query.assignedNurses = user;
-    } else if (user.role.name === 'caretaker') {
-      query.caretaker = user;
-    } else {
-      return res.status(403).json({ message: 'Unauthorized role' });
-    }
+  const patient = await Patient.findOne({ user: req.user._id }).lean();
+  if (!patient) throw new AppError(404, 'Patient record not found for this user');
 
-    const patients = await Patient.find(query).populate('assignedNurses', 'fullname email').populate('caretaker', 'fullname email');
-    res.status(200).json(patients);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching assigned patients', details: error.message });
+  const { after, limit } = req.query;
+  const filter = { patient: patient._id };
+  if (after) {
+    if (!isValidObjectId(after)) throw new AppError(400, 'Invalid cursor');
+    filter._id = { $gt: new Types.ObjectId(after) };
   }
-};
+  const pageSize = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+
+  const items = await Log.find(filter)
+    .sort({ _id: 1 })
+    .limit(pageSize)
+    .lean();
+
+  const nextCursor = items.length ? items[items.length - 1]._id : null;
+  res.status(200).json({ items, nextCursor, limit: pageSize });
+});
+
+// --- Logs (nurse/caretaker) -----------------------------------------------
 
 /**
- * @swagger
- * /api/v1/patients/entryreport:
- *   post:
- *     summary: Nurse logs a patient activity
- *     tags: [EntryReport]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - patientId
- *               - activityType
- *               - description
- *             properties:
- *               patientId:
- *                 type: string
- *               activityType:
- *                 type: string
- *                 example: eating
- *               description:
- *                 type: string
- *               timestamp:
- *                 type: string
- *                 format: date-time
- *                 example: 2024-05-01T14:00:00Z
- *     responses:
- *       201:
- *         description: Activity logged successfully
- *       400:
- *         description: Error logging activity
+ * POST /patients/:patientId/logs
  */
-exports.logEntry = async (req, res) => {
-  try {
-    const nurseId = req.user._id;
-    const { patientId, activityType, comment, timestamp } = req.body;
+exports.createLog = asyncHandler(async (req, res) => {
+  const { patientId } = req.params;
+  const { title, description, timestamp } = req.body || {};
 
-    const newActivity = new EntryReport({
-      nurse: nurseId,
-      patient: patientId,
-      activityType,
-      comment,
-      activityTimestamp: timestamp || new Date()
-    });
+  const patient = await loadPatientOr404(patientId);
+  assertAssignedOrThrow(req.user, patient);
 
-    await newActivity.save();
-    res.status(201).json({ message: 'Activity logged successfully', activity: newActivity });
-  } catch (error) {
-    res.status(400).json({ message: 'Error logging activity', details: error.message });
+  if (!title || !description || !timestamp) {
+    throw new AppError(400, 'title, description, timestamp are required');
   }
-};
+
+  const created = await Log.create({
+    title,
+    description,
+    timestamp: new Date(timestamp),
+    patient: patient._id,
+    createdBy: req.user._id,
+    createdByRole: req.user.role,
+  });
+
+  res.status(201).json({ message: 'Log created', log: created });
+});
 
 /**
- * @swagger
- * /api/v1/patients/activities:
- *   get:
- *     summary: Fetch activities for a patients
- *     tags: [EntryReport]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of patient activities
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/EntryReport'
- *       403:
- *         description: Unauthorized role
- *       500:
- *         description: Error fetching patient activities
+ * GET /patients/:patientId/logs
  */
-exports.getPatientActivities = async (req, res) => {
-  try {
-    const { patientId } = req.query;
-    if (!patientId) {
-      return res.status(400).json({ message: 'Missing patientId in query' });
-    }
+exports.listLogs = asyncHandler(async (req, res) => {
+  const { patientId } = req.params;
+  const { after, limit } = req.query;
 
-    const activities = await EntryReport.find({ patient: patientId })
-      .populate('nurse', 'fullname');
+  const patient = await loadPatientOr404(patientId);
+  assertAssignedOrThrow(req.user, patient);
 
-    // Map nurse field to just the fullname string
-    const formattedActivities = activities.map(activity => {
-      const obj = activity.toObject();
-      obj.nurse = obj.nurse ? obj.nurse.fullname : null;
-      return obj;
-    });
-
-    res.status(200).json(formattedActivities);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching patient activities', details: error.message });
+  const filter = { patient: patient._id };
+  if (after) {
+    if (!isValidObjectId(after)) throw new AppError(400, 'Invalid cursor');
+    filter._id = { $gt: new Types.ObjectId(after) };
   }
-};
+
+  const pageSize = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+
+  const items = await Log.find(filter)
+    .sort({ _id: 1 })
+    .limit(pageSize)
+    .lean();
+
+  const nextCursor = items.length ? items[items.length - 1]._id : null;
+  res.status(200).json({ items, nextCursor, limit: pageSize });
+});
 
 /**
- * @swagger
- * /api/v1/patients/entryreport/{entryId}:
- *   delete:
- *     summary: Delete an entry report
- *     tags: [EntryReport]
- *     parameters:
- *       - in: path
- *         name: entryId
- *         required: true
- *         schema:
- *           type: string
- *         description: The ID of the entry to delete
- *     responses:
- *       200:
- *         description: Entry deleted successfully
- *       404:
- *         description: Entry not found
- *       400:
- *         description: Error deleting entry
+ * DELETE /patients/:patientId/logs/:logId
+ * Only author can delete; admins cannot delete.
  */
-exports.deleteEntry = async (req, res) => {
-  try {
-    const entryReport = await EntryReport.findByIdAndDelete(req.params.entryId);
-    if (!entryReport) return res.status(404).json({ message: 'Entry not found' });
-    res.json({ message: 'Entry deleted successfully' });
-  } catch (error) {
-    res.status(400).json({ message: 'Error deleting entry', details: error.message });
-  }
-};
+exports.deleteLog = asyncHandler(async (req, res) => {
+  const { patientId, logId } = req.params;
+  if (!isValidObjectId(logId)) throw new AppError(400, 'Invalid logId');
 
-const calculateAge = dob => {
-  const today = new Date();
-  const birthDate = new Date(dob);
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
+  const patient = await loadPatientOr404(patientId);
+  assertAssignedOrThrow(req.user, patient);
 
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
+  const log = await Log.findOne({ _id: logId, patient: patient._id }).lean();
+  if (!log) throw new AppError(404, 'Log not found');
+
+  if (String(log.createdBy) !== String(req.user._id)) {
+    throw new AppError(403, 'Only the authoring nurse/caretaker can delete this log');
   }
 
-  return age;
-};
+  await Log.deleteOne({ _id: logId });
+  res.status(200).json({ message: 'Log deleted' });
+});

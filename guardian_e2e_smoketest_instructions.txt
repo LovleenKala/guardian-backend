@@ -1,0 +1,64 @@
+Guardian Backend – End-to-End Smoke Test Instructions
+======================================================
+
+This project includes a bash script (`guardian_e2e_smoketest.sh`) that runs a full smoke test of the backend API.
+It checks authentication, admin routes, patient roster, assignments, nurse views, and RBAC restrictions.
+
+---
+How to run the test
+-------------------
+
+1. Make sure the backend is running (by default on http://localhost:3000).
+
+2. Open a terminal (WSL, Linux, or Git Bash).
+
+3. Navigate to the folder containing the script:
+   cd /path/to/Guardian-Backend
+
+4. Make the script executable (only once is needed):
+   chmod +x guardian_e2e_smoketest.sh
+
+5. Run the script:
+   ./guardian_e2e_smoketest.sh
+
+---
+Environment variables
+---------------------
+The script defaults to:
+- BASE_URL=http://localhost:3000
+- ADMIN_EMAIL=alex.admin@example.test
+- ADMIN_PASS=Admin#1234
+- NURSE_EMAIL=nina.nurse@example.test
+- NURSE_PASS=Nurse#1234
+
+You can override these at runtime, e.g.:
+   BASE_URL=http://127.0.0.1:4000 ./guardian_e2e_smoketest.sh
+
+---
+What to expect
+--------------
+The script runs these steps:
+
+1. Admin login → expects token
+2. GET /admin/users → expects 200, selects a nurse
+3. GET /admin/patients/roster → expects 200/204, selects a patient
+4. PUT /admin/patients/{patientId}/assign → expects 200 (assignment updated)
+5. Nurse login → expects token
+6. GET /patients/assigned → expects 200/204, verifies patient appears for nurse
+7. Negative check: nurse requests /admin/users → expects 401/403
+
+✓ = step passed
+✗ = step failed (shows reason)
+
+---
+Troubleshooting
+---------------
+- If step 4 (assign patient) returns 400:
+  Ensure you are sending `patientId` in the request body as well as in the URL param.
+  Example body payload: {"patientId":"<id>","nurseId":"<id>"}
+
+- If tokens appear empty, verify the backend is running and seeded accounts are present.
+
+- If running on Windows without WSL or Git Bash, use WSL or Git Bash to execute the .sh file.
+
+---
