@@ -1,44 +1,41 @@
 const mongoose = require('mongoose');
-const User = require('./User');
 
 const PatientSchema = new mongoose.Schema({
-  fullname: { type: String, required: true },
+  // Link to the user account for self-access
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', unique: true, sparse: true },
+
+  fullName: { type: String, required: true, trim: true },
   dateOfBirth: { type: Date, required: true },
-  gender: { type: String, enum: ['male', 'female'], required: true },
+  guardian:       {
+    name:         { type: String },
+    contact:      { type: String } // guardian details
+  },
+  emergencyContact: { type: String },
+  
+  // Clinical / summary fields (read-only to patient via API)
+  medicalSummary: { type: String },
+  description:    { type: String }, // short description of condition
+  photoUrl:       { type: String }, //URL or upload picture?
 
-  profilePhoto: { type: String }, // Filename or full URL depending on storage strategy
+  admittedAt:     { type: Date }, // Date Of Admitting
+  org: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', default: null },
+  assignedNurse: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  assignedCaretaker: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+}, { timestamps: true, versionKey: false });
 
-  caretaker: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Single caretaker assigned
+// Indexes for common queries
+PatientSchema.index({ assignedNurse: 1 });
+PatientSchema.index({ assignedCaretaker: 1 });
+PatientSchema.index({ org: 1 });
+PatientSchema.index({ admittedAt: -1 });
+PatientSchema.index({ user: 1 }, { unique: true, sparse: true });
 
-  assignedNurses: [
-    { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-  ],
+// Admin-safe roster projection (no clinical fields)
+const ADMIN_ROSTER_PROJECTION = 'fullName org assignedNurse assignedCaretaker admittedAt createdAt updatedAt';
 
-  healthConditions: [{ type: String }], // Optional: List of chronic conditions, allergies, etc.
+// Patient self projection (currently allow full access);
+const PATIENT_SELF_PROJECTION = null; // null => full document access for now
 
-  created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
-});
-
-PatientSchema.pre('save', async function (next) {
-  try {
-    // Validate each assigned nurse has the role 'nurse'
-    if (this.assignedNurses && this.assignedNurses.length > 0) {
-      const nurses = await User.find({ _id: { $in: this.assignedNurses } }).populate('role');
-
-      const invalidUsers = nurses.filter(u => !u.role || u.role.name !== 'nurse');
-      if (invalidUsers.length > 0) {
-        return next(new Error('All assigned nurses must have the role "nurse".'));
-      }
-    }
-
-    this.updated_at = Date.now();
-    next();
-  } catch (err) {
-    next(err);
-  }
-});
-
-const Patient = mongoose.model('Patient', PatientSchema);
-
-module.exports = Patient;
+module.exports = mongoose.model('Patient', PatientSchema);
+module.exports.ADMIN_ROSTER_PROJECTION = ADMIN_ROSTER_PROJECTION;
+module.exports.PATIENT_SELF_PROJECTION = PATIENT_SELF_PROJECTION;

@@ -19,7 +19,7 @@ const fileFilter = (req, file, cb) => {
   if (allowedTypes.includes(file.mimetype)) cb(null, true);
   else cb(new Error('Only image files are allowed!'), false);
 };
-
-const upload = multer({ storage, fileFilter });
+// File size limited to 2MB
+const upload = multer({ storage, fileFilter, limits: { fileSize: 2 * 1024 * 1024 } });
 
 module.exports = upload;
