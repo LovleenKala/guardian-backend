@@ -1,253 +1,405 @@
-const { isValidObjectId, Types } = require('mongoose');
-const User = require('../models/User');
 const Patient = require('../models/Patient');
-const asyncHandler = require('../utils/asyncHandler');
-const AppError = require('../utils/appError');
-
-const { createTicket, getTickets, updateTicket } = require('../services/supportTicketService');
-
-const { ADMIN_ROSTER_PROJECTION } = require('../models/Patient');
-
-// --- Support tickets ---
-exports.createSupportTicket = asyncHandler(async (req, res) => {
-  const { subject, description, status } = req.body || {};
-  if (!subject || !description) {
-    throw new AppError(422, 'subject and description are required');
-  }
-  const ticket = await createTicket({
-    user: req.user._id,
-    subject,
-    description,
-    status,
-    createdBy: { user: req.user._id, timestamp: new Date() }
-  });
-  res.status(201).json({ message: 'Ticket created', ticket });
-});
-
-exports.listSupportTickets = asyncHandler(async (req, res) => {
-  const tickets = await getTickets(req.query);
-  res.status(200).json(tickets);
-});
-
-exports.updateSupportTicket = asyncHandler(async (req, res) => {
-  const { ticketId } = req.params;
-  if (!isValidObjectId(ticketId)) throw new AppError(400, 'Invalid ticketId');
-
-  const ticket = await updateTicket(ticketId, req.body, {
-    actorId: req.user._id,
-    role: req.user.role,
-    audit: { user: req.user._id, timestamp: new Date() }
-  });
-  if (!ticket) throw new AppError(404, 'Ticket not found');
-  res.status(200).json({ message: 'Ticket updated', ticket });
-});
-
-exports.listUsers = asyncHandler(async (req, res) => {
-  const { role, query, isApproved, limit = 50, after } = req.query;
-
-  const filter = {};
-  const SEARCHABLE_ROLES = ['admin', 'nurse', 'patient', 'caretaker'];
-
-  if (role) {
-    const roleFilter = String(role).toLowerCase().trim();
-    if (!SEARCHABLE_ROLES.includes(roleFilter)) {
-      throw new AppError(400, `Unknown role: ${role}`);
-    }
-    filter.role = roleFilter;
-  }
-
-  if (typeof isApproved !== 'undefined') {
-    if (isApproved === true || isApproved === 'true') {
-      filter.isApproved = true;
-    } else if (isApproved === false || isApproved === 'false') {
-      filter.isApproved = false;
-    } else {
-      throw new AppError(400, 'isApproved must be true/false');
-    }
-  }
-
-  if (query && String(query).trim()) {
-    const q = String(query).trim();
-    filter.$or = [
-      { fullName: { $regex: q, $options: 'i' } },
-      { email: { $regex: q, $options: 'i' } },
-    ];
-  }
-
-  if (after) {
-    if (!isValidObjectId(after)) throw new AppError(400, 'Invalid cursor');
-    filter._id = { $gt: new Types.ObjectId(after) };
-  }
-
-  const pageSize = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
-  const users = await User.find(filter)
-    .sort({ _id: 1 })
-    .limit(pageSize)
-    .lean();
-
-  const nextCursor = users.length ? users[users.length - 1]._id : null;
-  res.status(200).json({ items: users, nextCursor, limit: pageSize });
-});
-
-exports.listPatientsRoster = asyncHandler(async (req, res) => {
-  const { orgId, nurseId, caretakerId, limit = 50, after } = req.query;
-  const filter = {};
-  if (orgId) filter.org = orgId;
-  if (nurseId) filter.assignedNurse = nurseId;
-  if (caretakerId) filter.assignedCaretaker = caretakerId;
-  if (after) {
-    if (!isValidObjectId(after)) throw new AppError(400, 'Invalid cursor');
-    filter._id = { $gt: new Types.ObjectId(after) };
-  }
-
-  const items = await Patient.find(filter)
-    .select(ADMIN_ROSTER_PROJECTION)
-    .sort({ _id: 1 })
-    .limit(Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200))
-    .lean();
-
-  const nextCursor = items.length ? items[items.length - 1]._id : null;
-  res.status(200).json({ items, nextCursor, limit: Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200) });
-});
-
-// ---------------------- Assignments with strict rules ----------------------
+const HealthRecord = require('../models/HealthRecord');
+const Task = require('../models/Task');
+const CarePlan = require('../models/CarePlan');
+const SupportTicket = require('../models/SupportTicket');
+const Task = require('../models/Task');
 
 /**
- * PUT /admin/patients/:patientId/assign   (also POST /admin/assignments)
- * body: { patientId, nurseId?, caretakerId? }
- * Rules:
- *  - assignees must exist, have role nurse/caretaker respectively, and be isApproved
- *  - the same user cannot be both nurse and caretaker simultaneously
- *  - if patient.org is set => assignee.org must match patient.org
- *  - if patient.org is null => assignee.org must be null (freelancers-only patient)
+ * @swagger
+ * /api/v1/admin/patient-overview/{patientId}:
+ *   get:
+ *     summary: Fetch detailed patient overview
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the patient
+ *     responses:
+ *       200:
+ *         description: Detailed patient overview
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 patient:
+ *                   $ref: '#/components/schemas/Patient'
+ *                 healthRecords:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/HealthRecord'
+ *                 carePlan:
+ *                   $ref: '#/components/schemas/CarePlan'
+ *                 tasks:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Task'
+ *                 taskCompletionRate:
+ *                   type: number
+ *                   description: Percentage of completed tasks
+ *       404:
+ *         description: Patient not found
+ *       500:
+ *         description: Error fetching patient overview
  */
-exports.assignPatient = asyncHandler(async (req, res) => {
-  // Resolve patientId, nurseId, caretakerId from path → query → body
-  const patientId   = req.params.patientId ?? req.query.patientId ?? req.body.patientId;
-  const nurseId     = req.query.nurseId     ?? req.body.nurseId;
-  const caretakerId = req.query.caretakerId ?? req.body.caretakerId;
+exports.getPatientOverview = async (req, res) => {
+  try {
+    const { patientId } = req.params;
 
-  if (!isValidObjectId(patientId)) throw new AppError(400, 'Invalid patientId');
+    const patientDetails = await Patient.findById(patientId)
+      .populate('assignedCaretaker')
+      .populate('assignedNurse');
 
-  if (!nurseId && !caretakerId) throw new AppError(400, 'Provide nurseId and/or caretakerId');
+    if (!patientDetails) {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
 
-  if (nurseId && !isValidObjectId(nurseId)) throw new AppError(400, 'Invalid nurseId');
-  if (caretakerId && !isValidObjectId(caretakerId)) throw new AppError(400, 'Invalid caretakerId');
+    const healthRecords = await HealthRecord.find({ patient: patientId });
+    const tasks = await Task.find({ patient: patientId });
+    const carePlan = await CarePlan.findOne({ patient: patientId }).populate('tasks');
 
-  if (nurseId && caretakerId && nurseId === caretakerId) {
-    throw new AppError(400, 'The same user cannot be both nurse and caretaker');
+    const taskCompletionRate = tasks.length
+      ? (tasks.filter(task => task.status === 'completed').length / tasks.length) * 100
+      : 0;
+
+    const response = {
+      patient: patientDetails,
+      healthRecords,
+      carePlan,
+      tasks,
+      taskCompletionRate,
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching patient overview', details: error.message });
   }
+};
 
-  const patient = await Patient.findById(patientId);
-  if (!patient) throw new AppError(404, 'Patient not found');
+/**
+ * @swagger
+ * /api/v1/admin/support-ticket:
+ *   post:
+ *     summary: Create a support ticket
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - subject
+ *               - description
+ *             properties:
+ *               subject:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *                 default: open
+ *     responses:
+ *       201:
+ *         description: Support ticket created successfully
+ *       500:
+ *         description: Error creating support ticket
+ */
+exports.createSupportTicket = async (req, res) => {
+  try {
+    const { subject, description, status } = req.body;
 
-  let nurse = null, caretaker = null;
+    const newTicket = new SupportTicket({
+      user: req.user._id,
+      subject,
+      description,
+      status: status || 'open',
+    });
 
-  if (nurseId) {
-    nurse = await User.findById(nurseId).lean();
-    if (!nurse || nurse.role !== 'nurse') throw new AppError(400, 'nurseId must be a valid nurse user');
-    if (!nurse.isApproved) throw new AppError(403, 'Nurse is not approved');
+    await newTicket.save();
+    res.status(201).json({ message: 'Support ticket created', ticket: newTicket });
+  } catch (error) {
+    res.status(500).json({ message: 'Error creating support ticket', details: error.message });
   }
-  if (caretakerId) {
-    caretaker = await User.findById(caretakerId).lean();
-    if (!caretaker || caretaker.role !== 'caretaker') throw new AppError(400, 'caretakerId must be a valid caretaker user');
-    if (!caretaker.isApproved) throw new AppError(403, 'Caretaker is not approved');
+};
+
+/**
+ * @swagger
+ * /api/v1/admin/support-tickets:
+ *   get:
+ *     summary: Fetch all support tickets
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter tickets by status (e.g., open, closed)
+ *       - in: query
+ *         name: userId
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter tickets by user ID
+ *     responses:
+ *       200:
+ *         description: List of support tickets
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/SupportTicket'
+ *       500:
+ *         description: Error fetching support tickets
+ */
+exports.getSupportTickets = async (req, res) => {
+  try {
+    const { status, userId } = req.query;
+
+    const query = {};
+    if (status) query.status = status;
+    if (userId) query.user = userId;
+
+    const tickets = await SupportTicket.find(query).populate('user');
+    res.status(200).json(tickets);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching support tickets', details: error.message });
   }
+};
 
-  // Org coherence
-  const pOrg = patient.org || null;
-  const nurseOrg = nurse ? nurse.org || null : null;
-  const caretakerOrg = caretaker ? caretaker.org || null : null;
+/**
+ * @swagger
+ * /api/v1/admin/support-ticket/{ticketId}:
+ *   put:
+ *     summary: Update a support ticket
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: ticketId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the support ticket to be updated
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 description: New status of the support ticket (e.g., open, closed)
+ *               adminResponse:
+ *                 type: string
+ *                 description: Response or comments from the admin
+ *     responses:
+ *       200:
+ *         description: Support ticket updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 ticket:
+ *                   $ref: '#/components/schemas/SupportTicket'
+ *       404:
+ *         description: Support ticket not found
+ *       500:
+ *         description: Error updating support ticket
+ */
+exports.updateSupportTicket = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { status, adminResponse } = req.body;
 
-  if (pOrg) {
-    if (nurse && String(nurseOrg) !== String(pOrg)) throw new AppError(403, 'Nurse must belong to the patient’s organisation');
-    if (caretaker && String(caretakerOrg) !== String(pOrg)) throw new AppError(403, 'Caretaker must belong to the patient’s organisation');
-  } else {
-    if (nurse && nurseOrg) throw new AppError(403, 'Freelance patient cannot be assigned an organisation nurse');
-    if (caretaker && caretakerOrg) throw new AppError(403, 'Freelance patient cannot be assigned an organisation caretaker');
+    const updatedTicket = await SupportTicket.findByIdAndUpdate(
+      ticketId,
+      { status, adminResponse },
+      { new: true }
+    );
+
+    if (!updatedTicket) {
+      return res.status(404).json({ message: 'Support ticket not found' });
+    }
+
+    res.status(200).json({ message: 'Support ticket updated', ticket: updatedTicket });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating support ticket', details: error.message });
   }
+};
 
-  // Apply assignment
-  if (nurse) patient.assignedNurse = nurse._id;
-  if (caretaker) patient.assignedCaretaker = caretaker._id;
-  await patient.save();
+/**
+ * @swagger
+ * /api/v1/admin/tasks:
+ *   post:
+ *     summary: Create a new task
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - description
+ *               - patientId
+ *               - dueDate
+ *               - assignedTo
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               patientId:
+ *                 type: string
+ *                 description: ID of the patient to whom the task is assigned
+ *               dueDate:
+ *                 type: string
+ *                 format: date
+ *               assignedTo:
+ *                 type: string
+ *                 description: ID of the user (caretaker or nurse) assigned to the task
+ *     responses:
+ *       201:
+ *         description: Task created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 task:
+ *                   $ref: '#/components/schemas/Task'
+ *       500:
+ *         description: Error creating task
+ */
+exports.createTask = async (req, res) => {
+  try {
+    const { title, description, patientId, dueDate, assignedTo } = req.body;
 
-  res.status(200).json({ message: 'Assignment updated', patient });
-});
+    const newTask = new Task({ title, description, patient: patientId, dueDate, assignedTo });
+    await newTask.save();
 
-// ------------------------ Role approve / revoke / update / reset / delete --------------------
-exports.approveUser = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-  if (!isValidObjectId(userId)) throw new AppError(400, 'Invalid userId');
-  if (String(req.user._id) === userId) throw new AppError(400, 'Cannot modify your own approval status');
+    res.status(201).json({ message: 'Task created successfully', task: newTask });
+  } catch (error) {
+    res.status(500).json({ message: 'Error creating task', details: error.message });
+  }
+};
 
-  const user = await User.findByIdAndUpdate(
-    userId,
-    { isApproved: true },
-    { new: true }
-  );
-  if (!user) throw new AppError(404, 'User not found');
-  res.status(200).json({ message: 'User approved', user });
-});
+/**
+ * @swagger
+ * /api/v1/admin/tasks/{taskId}:
+ *   put:
+ *     summary: Update a task
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: taskId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the task to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               dueDate:
+ *                 type: string
+ *                 format: date
+ *               assignedTo:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Task updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 task:
+ *                   $ref: '#/components/schemas/Task'
+ *       404:
+ *         description: Task not found
+ *       500:
+ *         description: Error updating task
+ */
+exports.updateTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const updateData = req.body;
 
-exports.revokeUser = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-  if (!isValidObjectId(userId)) throw new AppError(400, 'Invalid userId');
-  if (String(req.user._id) === userId) throw new AppError(400, 'Cannot modify your own approval status');
+    const updatedTask = await Task.findByIdAndUpdate(taskId, updateData, { new: true });
 
-  const user = await User.findByIdAndUpdate(
-    userId,
-    { isApproved: false },
-    { new: true }
-  );
-  if (!user) throw new AppError(404, 'User not found');
-  res.status(200).json({ message: 'User access revoked', user });
-});
+    if (!updatedTask) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
 
-exports.updateUserRole = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-  const { newRole } = req.body || {};
-  if (String(req.user._id) === String(userId)) throw new AppError(400, 'Cannot change your own role');
-  if (!isValidObjectId(userId)) throw new AppError(400, 'Invalid userId');
-  if (!['admin','nurse','patient','caretaker'].includes(newRole)) throw new AppError(400, 'Invalid role');
+    res.status(200).json({ message: 'Task updated successfully', task: updatedTask });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating task', details: error.message });
+  }
+};
 
-  const updated = await User.findByIdAndUpdate(userId, { role: newRole }, { new: true });
-  if (!updated) throw new AppError(404, 'User not found');
-  res.status(200).json({ message: 'User role updated', user: updated });
-});
+/**
+ * @swagger
+ * /api/v1/admin/tasks/{taskId}:
+ *   delete:
+ *     summary: Delete a task
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: taskId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the task to delete
+ *     responses:
+ *       200:
+ *         description: Task deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       404:
+ *         description: Task not found
+ *       500:
+ *         description: Error deleting task
+ */
+exports.deleteTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
 
-exports.resetPassword = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-  if (!isValidObjectId(userId)) throw new AppError(400, 'Invalid userId');
+    const deletedTask = await Task.findByIdAndDelete(taskId);
 
-  // Generate a temporary password; force change on next login
-  const tmp = Math.random().toString(36).slice(-10) + 'A1!';
+    if (!deletedTask) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
 
-  const user = await User.findById(userId).select('+passwordHash');
-  if (!user) throw new AppError(404, 'User not found');
-
-  user.passwordHash = tmp; // pre-save hook should hash
-  user.lastPasswordChange = new Date();
-  user.failedLoginAttempts = 0;
-  await user.save();
-
-  res.status(200).json({ message: 'Password reset to temporary value; user must change on next login' });
-});
-
-exports.deleteUser = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-  if (!isValidObjectId(userId)) throw new AppError(400, 'Invalid userId');
-  await User.deleteOne({ _id: userId });
-  res.status(200).json({ message: 'User deleted' });
-});
-
-// -------------------------- Directory metrics -----------------------------
-
-exports.getDirectoryMetrics = asyncHandler(async (_req, res) => {
-  const [patients, nurses, caretakers] = await Promise.all([
-    Patient.countDocuments(),
-    User.countDocuments({ role: 'nurse' }),
-    User.countDocuments({ role: 'caretaker' }),
-  ]);
-  res.status(200).json({ patients, nurses, caretakers });
-});
+    res.status(200).json({ message: 'Task deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting task', details: error.message });
+  }
+};

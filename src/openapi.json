@@ -1,37 +1,214 @@
 {
-  "openapi": "3.0.3",
+  "openapi": "3.0.0",
   "info": {
     "title": "Guardian API",
-    "version": "1.0.0.2025.08.18",
-    "description": "Code-synchronized OpenAPI (generated from mounted Express routes)"
+    "version": "1.0.0",
+    "description": "API documentation for the Guardian Monitoring App"
   },
-  "servers": [
-    {
-      "url": "http://localhost:3000",
-      "description": "Local"
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["fullname", "email", "password", "role"],
+                "properties": {
+                  "fullname": { "type": "string" },
+                  "email": { "type": "string" },
+                  "password": { "type": "string" },
+                  "role": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "User registered successfully" },
+          "400": { "description": "Bad request" }
+        }
+      }
     },
-    {
-      "url": "https://api.guardian.local",
-      "description": "Prod (example)"
+    "/api/v1/auth/login": {
+      "post": {
+        "summary": "Log in a user",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful" },
+          "400": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/api/v1/admin/support-ticket": {
+      "post": {
+        "summary": "Create a support ticket",
+        "tags": ["Admin"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["subject", "description"],
+                "properties": {
+                  "subject": { "type": "string" },
+                  "description": { "type": "string" },
+                  "status": { "type": "string", "default": "open" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Support ticket created successfully" },
+          "500": { "description": "Error creating support ticket" }
+        }
+      }
+    },
+    "/api/v1/admin/tasks": {
+      "post": {
+        "summary": "Create a new task",
+        "tags": ["Admin"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "description", "patientId", "dueDate"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "patientId": { "type": "string" },
+                  "dueDate": { "type": "string", "format": "date" },
+                  "assignedTo": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Task created successfully" },
+          "500": { "description": "Error creating task" }
+        }
+      }
+    },
+    "/api/v1/caretaker/assigned-patients": {
+      "get": {
+        "summary": "Fetch patients assigned to a caretaker",
+        "tags": ["Caretaker"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of assigned patients",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Patient" }
+                }
+              }
+            }
+          },
+          "403": { "description": "Unauthorized role" },
+          "500": { "description": "Error fetching assigned patients" }
+        }
+      }
+    },
+    "/api/v1/health-records/{patientId}": {
+      "get": {
+        "summary": "Fetch health records for a patient",
+        "tags": ["HealthRecord"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "patientId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The ID of the patient"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Health records retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/HealthRecord" }
+                }
+              }
+            }
+          },
+          "404": { "description": "Patient not found" },
+          "500": { "description": "Error fetching health records" }
+        }
+      }
+    },
+    "/api/v1/nurse/assigned-patients": {
+      "get": {
+        "summary": "Fetch patients assigned to a nurse",
+        "tags": ["Nurse"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of assigned patients",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Patient" }
+                }
+              }
+            }
+          },
+          "403": { "description": "Unauthorized role" },
+          "500": { "description": "Error fetching assigned patients" }
+        }
+      }
+    },
+    "/api/v1/user/profile": {
+      "get": {
+        "summary": "Fetch user profile",
+        "tags": ["User"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "User profile retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" },
+          "500": { "description": "Error fetching user profile" }
+        }
+      }
     }
-  ],
-  "tags": [
-    {
-      "name": "Admin"
-    },
-    {
-      "name": "Users"
-    },
-    {
-      "name": "Patients"
-    },
-    {
-      "name": "Credentials"
-    },
-    {
-      "name": "WifiCSI"
-    }
-  ],
+  },
   "components": {
     "securitySchemes": {
       "bearerAuth": {
@@ -41,2202 +218,37 @@
       }
     },
     "schemas": {
-      "User": {
-        "type": "object",
-        "properties": {
-          "_id": {
-            "type": "string"
-          },
-          "fullName": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "admin",
-              "nurse",
-              "patient",
-              "caretaker"
-            ]
-          },
-          "org": {
-            "type": "string",
-            "nullable": true
-          },
-          "isApproved": {
-            "type": "boolean"
-          }
-        }
-      },
-      "Credential": {
-        "type": "object",
-        "properties": {
-          "_id": {
-            "type": "string"
-          },
-          "user": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "AHPRA",
-              "QUALIFICATION",
-              "CERTIFICATE",
-              "OTHER"
-            ]
-          },
-          "identifier": {
-            "type": "string"
-          },
-          "issuer": {
-            "type": "string"
-          },
-          "issuedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "verified": {
-            "type": "boolean"
-          },
-          "verifiedBy": {
-            "type": "string",
-            "nullable": true
-          },
-          "verifiedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "notes": {
-            "type": "string"
-          }
-        }
-      },
-      "PatientListItem": {
-        "type": "object",
-        "properties": {
-          "_id": {
-            "type": "string"
-          },
-          "fullName": {
-            "type": "string"
-          },
-          "org": {
-            "type": "string",
-            "nullable": true
-          },
-          "assignedNurse": {
-            "type": "string",
-            "nullable": true
-          },
-          "assignedCaretaker": {
-            "type": "string",
-            "nullable": true
-          },
-          "admittedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
       "Patient": {
         "type": "object",
         "properties": {
-          "_id": {
-            "type": "string"
-          },
-          "fullName": {
-            "type": "string"
-          },
-          "dateOfBirth": {
-            "type": "string",
-            "format": "date"
-          },
-          "guardian": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "contact": {
-                "type": "string"
-              }
-            }
-          },
-          "emergencyContact": {
-            "type": "string"
-          },
-          "medicalSummary": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "photoUrl": {
-            "type": "string",
-            "format": "uri"
-          },
-          "admittedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "org": {
-            "type": "string",
-            "nullable": true
-          },
-          "user": {
-            "type": "string",
-            "nullable": true
-          },
-          "assignedNurse": {
-            "type": "string",
-            "nullable": true
-          },
-          "assignedCaretaker": {
-            "type": "string",
-            "nullable": true
+          "id": { "type": "string" },
+          "fullname": { "type": "string" },
+          "age": { "type": "integer" },
+          "gender": { "type": "string" },
+          "caretaker": { "type": "string" },
+          "assignedNurses": {
+            "type": "array",
+            "items": { "type": "string" }
           }
         }
       },
-      "Log": {
+      "HealthRecord": {
         "type": "object",
         "properties": {
-          "_id": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "patient": {
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string"
-          },
-          "createdByRole": {
-            "type": "string",
-            "enum": [
-              "nurse",
-              "caretaker"
-            ]
-          }
+          "id": { "type": "string" },
+          "patientId": { "type": "string" },
+          "recordType": { "type": "string" },
+          "description": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
         }
       },
-      "WifiCSI": {
+      "User": {
         "type": "object",
         "properties": {
-          "_id": {
-            "type": "string"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "csi_data": {
-            "type": "object"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      }
-    }
-  },
-  "paths": {
-    "/api/v1/wifi-csi": {
-      "post": {
-        "tags": [
-          "WifiCSI"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "timestamp": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "csi_data": {
-                    "type": "object"
-                  }
-                },
-                "required": [
-                  "timestamp",
-                  "csi_data"
-                ]
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "WifiCSI"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "in": "query",
-            "name": "before",
-            "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          {
-            "in": "query",
-            "name": "cursor",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/patients": {
-      "post": {
-        "tags": [
-          "Patients"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "fullName": {
-                    "type": "string"
-                  },
-                  "dateOfBirth": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "guardian": {
-                    "type": "object"
-                  },
-                  "emergencyContact": {
-                    "type": "string"
-                  },
-                  "medicalSummary": {
-                    "type": "string"
-                  },
-                  "description": {
-                    "type": "string"
-                  },
-                  "photoUrl": {
-                    "type": "string",
-                    "format": "uri"
-                  },
-                  "admittedAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "org": {
-                    "type": "string",
-                    "nullable": true
-                  },
-                  "user": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "fullName",
-                  "dateOfBirth"
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/patients/assigned": {
-      "get": {
-        "tags": [
-          "Patients"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/patients/{patientId}/logs": {
-      "post": {
-        "tags": [
-          "Patients"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "patientId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "title": {
-                    "type": "string"
-                  },
-                  "description": {
-                    "type": "string"
-                  },
-                  "timestamp": {
-                    "type": "string",
-                    "format": "date-time"
-                  }
-                },
-                "required": [
-                  "title",
-                  "description",
-                  "timestamp"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "Patients"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "patientId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/patients/{patientId}/logs/{logId}": {
-      "delete": {
-        "tags": [
-          "Patients"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "patientId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "logId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/patients/me": {
-      "get": {
-        "tags": [
-          "Patients"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/patients/me/logs": {
-      "get": {
-        "tags": [
-          "Patients"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/credentials": {
-      "post": {
-        "tags": [
-          "Credentials"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "AHPRA",
-                      "QUALIFICATION",
-                      "CERTIFICATE",
-                      "OTHER"
-                    ]
-                  },
-                  "identifier": {
-                    "type": "string"
-                  },
-                  "issuer": {
-                    "type": "string"
-                  },
-                  "issuedAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "expiresAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "notes": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "type",
-                  "identifier"
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/credentials/me": {
-      "get": {
-        "tags": [
-          "Credentials"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/credentials/{credentialId}": {
-      "patch": {
-        "tags": [
-          "Credentials"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "credentialId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "enum": [
-                      "AHPRA",
-                      "QUALIFICATION",
-                      "CERTIFICATE",
-                      "OTHER"
-                    ]
-                  },
-                  "identifier": {
-                    "type": "string"
-                  },
-                  "issuer": {
-                    "type": "string"
-                  },
-                  "issuedAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "expiresAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "notes": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Credentials"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "credentialId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/credentials/admin": {
-      "get": {
-        "tags": [
-          "Credentials"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "userId",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/credentials/admin/{credentialId}/verify": {
-      "post": {
-        "tags": [
-          "Credentials"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "credentialId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/credentials/admin/{credentialId}/unverify": {
-      "post": {
-        "tags": [
-          "Credentials"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "credentialId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/credentials/admin/{credentialId}": {
-      "delete": {
-        "tags": [
-          "Credentials"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "credentialId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/users": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "role",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "admin",
-                "nurse",
-                "patient",
-                "caretaker"
-              ]
-            }
-          },
-          {
-            "in": "query",
-            "name": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "isApproved",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "true",
-                "false"
-              ]
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/api/v1/admin/users/{userId}/approve": {
-      "put": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/api/v1/admin/users/{userId}/revoke": {
-      "put": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/api/v1/admin/users/{userId}/role": {
-      "put": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/api/v1/admin/users/{userId}": {
-      "delete": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/api/v1/admin/users/{userId}/reset-password": {
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "userId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/api/v1/admin/patients/roster": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "orgId",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "nurseId",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "caretakerId",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/api/v1/admin/patients/{patientId}/assign": {
-      "put": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "patientId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "patientId": {
-                    "type": "string"
-                  },
-                  "nurseId": {
-                    "type": "string"
-                  },
-                  "caretakerId": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/assignments": {
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "patientId": {
-                    "type": "string"
-                  },
-                  "nurseId": {
-                    "type": "string"
-                  },
-                  "caretakerId": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "patientId"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/tickets": {
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "subject": {
-                    "type": "string"
-                  },
-                  "description": {
-                    "type": "string"
-                  },
-                  "status": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "subject",
-                  "description"
-                ]
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/api/v1/admin/tickets/{ticketId}": {
-      "put": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "ticketId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/metrics": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "x-roles": [
-          "admin"
-        ]
-      }
-    },
-    "/api/v1/users/register": {
-      "post": {
-        "tags": [
-          "Users"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "fullName": {
-                    "type": "string"
-                  },
-                  "email": {
-                    "type": "string",
-                    "format": "email"
-                  },
-                  "password": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "fullName",
-                  "email",
-                  "password"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/users/login": {
-      "post": {
-        "tags": [
-          "Users"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "format": "email"
-                  },
-                  "password": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "email",
-                  "password"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/users/profile": {
-      "patch": {
-        "tags": [
-          "Users"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "fullName": {
-                    "type": "string"
-                  },
-                  "email": {
-                    "type": "string",
-                    "format": "email"
-                  }
-                },
-                "additionalProperties": false
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/users/change-password": {
-      "post": {
-        "tags": [
-          "Users"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "oldPassword": {
-                    "type": "string"
-                  },
-                  "newPassword": {
-                    "type": "string"
-                  },
-                  "confirmPassword": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "oldPassword",
-                  "newPassword",
-                  "confirmPassword"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/users/reset-password-request": {
-      "post": {
-        "tags": [
-          "Users"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "format": "email"
-                  }
-                },
-                "required": [
-                  "email"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/users/reset-password": {
-      "get": {
-        "tags": [
-          "Users"
-        ],
-        "summary": "",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "token",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Users"
-        ],
-        "summary": "",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "token": {
-                    "type": "string"
-                  },
-                  "newPassword": {
-                    "type": "string"
-                  },
-                  "confirmPassword": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "token",
-                  "newPassword",
-                  "confirmPassword"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
+          "id": { "type": "string" },
+          "fullname": { "type": "string" },
+          "email": { "type": "string" },
+          "role": { "type": "string" }
         }
       }
     }

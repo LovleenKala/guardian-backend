@@ -1,5 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
+const seedRoles = require('../seedRoles');
 const seedData = require('../seedData');
 
 const mongoDBUrl = process.env.MONGODB_URI;
@@ -13,6 +14,9 @@ const connectDB = async () => {
       useUnifiedTopology: true,
     });
     console.log("MongoDB connected successfully");
+
+    // Seed roles when the server starts
+    await seedRoles();
 
     // Seed data when the server starts
     await seedData();
