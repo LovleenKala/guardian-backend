@@ -6,8 +6,6 @@ const verifyToken = require('../middleware/verifyToken');
 const verifyRole = require('../middleware/verifyRole');
 const adminController = require('../controllers/adminController');
 
-
-
 // Example route protected by role (only admins can access)
 router.post('/admin/approve-nurse/:nurseId', verifyToken, verifyRole(['admin']), async (req, res) => {
   try {
@@ -58,7 +56,7 @@ router.get('/caretakers', verifyToken, verifyRole(['admin']), async (req, res) =
 // Patient Overview API
 router.get('/patients/:patientId', verifyToken, verifyRole(['admin']), adminController.getPatientOverview);
 // Support Tickets APIs
-router.post('/support-ticket', verifyToken, adminController.createSupportTicket);
+router.post('/support-tickets', verifyToken, adminController.createSupportTicket);
 router.get('/support-tickets', verifyToken, verifyRole(['admin']), adminController.getSupportTickets);
 router.put('/support-tickets/:ticketId', verifyToken, verifyRole(['admin']), adminController.updateSupportTicket);
 

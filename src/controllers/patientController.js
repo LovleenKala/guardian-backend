@@ -1,7 +1,7 @@
 const Patient = require('../models/Patient');
 const User = require('../models/User');
 const EntryReport = require('../models/EntryReport');
-const notifyRules = require('../services/notifyRules');
+
 
 /**
  * @swagger
@@ -59,13 +59,6 @@ exports.addPatient = async (req, res) => {
     });
 
     await newPatient.save();
-    Promise.resolve(
-      notifyRules.patientCreated({
-        patientId: newPatient._id,
-        actorId: req.user?._id,
-        caretakerId
-      })
-    ).catch(() => {});
     res.status(201).json({ message: 'Patient added successfully', patient: { ...newPatient.toObject(), age: calculateAge(newPatient.dateOfBirth) } });
   } catch (err) {
     res.status(400).json({ message: 'Error adding your patient', details: err.message });
