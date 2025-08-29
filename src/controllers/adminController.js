@@ -4,7 +4,6 @@ const Task = require('../models/Task');
 const CarePlan = require('../models/CarePlan');
 const SupportTicket = require('../models/SupportTicket');
 const Task = require('../models/Task');
-const notifyRules = require('../services/notifyRules');
 
 /**
  * @swagger
@@ -122,13 +121,6 @@ exports.createSupportTicket = async (req, res) => {
     });
 
     await newTicket.save();
-    Promise.resolve(
-      notifyRules.supportTicketCreated({
-        ticketId: newTicket._id,
-        userId: newTicket.user,
-        actorId: req.user?._id
-      })
-    ).catch(() => {});
     res.status(201).json({ message: 'Support ticket created', ticket: newTicket });
   } catch (error) {
     res.status(500).json({ message: 'Error creating support ticket', details: error.message });
@@ -238,14 +230,7 @@ exports.updateSupportTicket = async (req, res) => {
     if (!updatedTicket) {
       return res.status(404).json({ message: 'Support ticket not found' });
     }
-    Promise.resolve(
-      notifyRules.supportTicketUpdated({
-        ticketId: updatedTicket._id,
-        userId: updatedTicket.user,
-        status: updatedTicket.status,
-        actorId: req.user?._id
-      })
-    ).catch(() => {});
+
     res.status(200).json({ message: 'Support ticket updated', ticket: updatedTicket });
   } catch (error) {
     res.status(500).json({ message: 'Error updating support ticket', details: error.message });
@@ -305,15 +290,6 @@ exports.createTask = async (req, res) => {
 
     const newTask = new Task({ title, description, patient: patientId, dueDate, assignedTo });
     await newTask.save();
-    Promise.resolve(
-      notifyRules.taskCreated({
-        taskId: newTask._id,
-        patientId,
-        assignedTo: newTask.assignedTo,
-        dueDate: newTask.dueDate,
-        actorId: req.user?._id
-      })
-    ).catch(() => {});
 
     res.status(201).json({ message: 'Task created successfully', task: newTask });
   } catch (error) {
@@ -377,16 +353,6 @@ exports.updateTask = async (req, res) => {
     if (!updatedTask) {
       return res.status(404).json({ message: 'Task not found' });
     }
-    Promise.resolve(
-      notifyRules.taskUpdated({
-        taskId: updatedTask._id,
-        patientId: updatedTask.patient,
-        assignedTo: updatedTask.assignedTo,
-        status: updatedTask.status,
-        dueDate: updatedTask.dueDate,
-        actorId: req.user?._id
-      })
-    ).catch(() => {});
 
     res.status(200).json({ message: 'Task updated successfully', task: updatedTask });
   } catch (error) {
@@ -431,14 +397,6 @@ exports.deleteTask = async (req, res) => {
     if (!deletedTask) {
       return res.status(404).json({ message: 'Task not found' });
     }
-    Promise.resolve(
-      notifyRules.taskDeleted({
-        taskId,
-        patientId: deletedTask.patient,
-        assignedTo: deletedTask.assignedTo,
-        actorId: req.user?._id
-      })
-       ).catch(() => {});
 
     res.status(200).json({ message: 'Task deleted successfully' });
   } catch (error) {
