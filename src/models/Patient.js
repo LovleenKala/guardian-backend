@@ -18,7 +18,6 @@ const PatientSchema = new mongoose.Schema({
   isDeleted: { type: Boolean, default: false, index: true },
   deletedAt: { type: Date },
   deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });

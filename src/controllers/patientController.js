@@ -72,7 +72,7 @@ exports.addPatient = async (req, res) => {
  *     summary: Soft delete a patient
  *     description: |
  *       Marks the patient as deleted (non-destructive).
- *       The record remains in the database with `isDeleted` set to `true`.
+ *       The record remains in the database with isDeleted set to true.
  *     tags: [Patient]
  *     security:
  *       - bearerAuth: []
@@ -132,7 +132,6 @@ exports.deletePatient = async (req, res) => {
     return res.status(500).json({ message: 'Error deleting patient', details: err.message });
   }
 };
-
 
 /**
  * @swagger
