@@ -51,7 +51,7 @@ UserSchema.pre('save', async function (next) {
   this.updated_at = Date.now();
 
   if (!this.isModified('password_hash')) return next();
-  if (!this.password_hash)               return next(); // 社交注册：无密码，直接跳过
+  if (!this.password_hash)               return next(); // Social registration: no password, skip directly
 
   const salt = await bcrypt.genSalt(10);
   this.password_hash = await bcrypt.hash(this.password_hash, salt);
