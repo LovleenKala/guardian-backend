@@ -67,6 +67,75 @@ exports.addPatient = async (req, res) => {
 
 /**
  * @swagger
+ * /api/v1/patients/{patientId}:
+ *   delete:
+ *     summary: Soft delete a patient
+ *     description: |
+ *       Marks the patient as deleted (non-destructive).
+ *       The record remains in the database with `isDeleted` set to `true`.
+ *     tags: [Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ObjectId of the patient
+ *     responses:
+ *       '200':
+ *         description: Patient soft-deleted
+ *       '400':
+ *         description: Invalid patient id
+ *       '404':
+ *         description: Patient not found
+ *       '410':
+ *         description: Patient already deleted
+ *       '500':
+ *         description: Server error
+ */
+
+exports.deletePatient = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    // Try to load the patient; catch invalid ObjectId without importing mongoose
+    let patient;
+    try {
+      patient = await Patient.findById(patientId);
+    } catch (e) {
+      if (e.name === 'CastError') {
+        return res.status(400).json({ message: 'Invalid patient id' });
+      }
+      throw e;
+    }
+
+    if (!patient) {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+
+    if (patient.isDeleted) {
+      return res.status(410).json({ message: 'Patient already deleted' });
+    }
+
+    // Soft delete
+    patient.isDeleted = true;
+    patient.deletedAt = new Date();
+    if (req.user && req.user._id) {
+      patient.deletedBy = req.user._id;
+    }
+
+    await patient.save();
+    return res.status(200).json({ message: 'Patient deleted', id: patientId });
+  } catch (err) {
+    return res.status(500).json({ message: 'Error deleting patient', details: err.message });
+  }
+};
+
+
+/**
+ * @swagger
  * /api/v1/patient/{patientId}:
  *   get:
  *     summary: Fetch patient details

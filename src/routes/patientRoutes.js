@@ -7,6 +7,7 @@ const upload = require('../middleware/multer');
 
 router.post('/add', verifyToken, upload.single('photo'), patientController.addPatient);
 router.post('/assign-nurse', verifyToken, verifyRole(['caretaker']), patientController.assignNurseToPatient);
+router.delete('/:patientId', verifyToken, patientController.deletePatient);
 router.get('/assigned-patients', verifyToken, patientController.getAssignedPatients);
 router.get('/', verifyToken, patientController.getPatientDetails);
 
