@@ -153,6 +153,8 @@ app.use(express.json());
 // (e.g., Facebook, Google) are hooked into the Express app
 app.use(passport.initialize());
 
+const cookieParser = require('cookie-parser');
+app.use(cookieParser());  
 
 const userRoutes = require('./routes/user');
 const caretakerRoutes = require('./routes/caretakerRoutes');
