@@ -4,15 +4,18 @@ const express = require('express');
 const path = require('path');
 const database = require('./config/db');
 const multer = require('multer');
+const http = require('http');
+const socketIO = require('socket.io');
 
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
+const { setEmit } = require('../socket');
 
 const app = express();
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // Save to "uploads" folder
+    cb(null, 'uploads/');
   },
   filename: (req, file, cb) => {
     const uniqueName = `${Date.now()}-${file.originalname}`;
@@ -24,7 +27,6 @@ exports.upload = multer({ storage });
 
 app.use('/uploads', express.static('uploads'));
 
-// Security Middleware
 const blockScriptRequests = (req, res, next) => {
   const userAgent = req.headers['user-agent'] || '';
   const normalizedUserAgent = userAgent.toLowerCase();
@@ -32,7 +34,6 @@ const blockScriptRequests = (req, res, next) => {
   console.log(`Incoming Request - User-Agent: ${normalizedUserAgent}`);
   console.log('Request Headers:', req.headers);
 
-  // Disallowed User-Agents
   const disallowedUserAgents = [
     'curl',
     'wget',
@@ -44,55 +45,43 @@ const blockScriptRequests = (req, res, next) => {
     'httpie',
   ];
 
-  // Browser headers to check
   const requiredBrowserHeaders = {
     'sec-fetch-site': /same-origin|cross-site/,
     'sec-fetch-mode': /navigate|cors/,
     'sec-fetch-dest': /document|iframe/,
     'referer': /http(s)?:\/\//,
     'accept': /text\/html|application\/json|\*\/\*/,
-    'cookie': /.*/, // At least one cookie (adjust based on your app)
+    'cookie': /.*/,
   };
 
-  // Block disallowed User-Agents
   if (!userAgent || disallowedUserAgents.some(ua => normalizedUserAgent.includes(ua))) {
     console.log('Blocked Request - Disallowed User-Agent Detected');
     return res.status(403).json({ error: 'Forbidden: CLI or script-based requests are not allowed.' });
   }
 
-  // Check for browser-specific headers
   for (const [header, pattern] of Object.entries(requiredBrowserHeaders)) {
     const headerValue = req.headers[header];
-
-    // Skip validation for optional headers if they are missing
     if (['sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest'].includes(header) && !headerValue) {
-      continue; // Allow requests without these optional headers
+      continue;
     }
-
-    // Skip validation for the "referer" header if it's missing
     if (header === 'referer' && !headerValue) {
-      continue; // Allow requests without a "referer" header
+      continue;
     }
-
     if (!headerValue || !pattern.test(headerValue)) {
       console.log(`Blocked Request - Missing or Invalid Header: ${header}`);
       return res.status(403).json({ error: `Forbidden: Missing or invalid ${header} header.` });
     }
   }
 
-  // Additional validation: Block requests missing cookies (optional)
   if (!req.headers['cookie']) {
     console.log('Blocked Request - Missing Cookie Header');
     return res.status(403).json({ error: 'Forbidden: Missing browser-specific cookie header.' });
   }
 
-  next(); // Allow legitimate requests
+  next();
 };
 
-// Apply middleware globally to all endpoints 
-// TODO: Need to test this middleware with requests from browsers, postman, and the application
 // app.use(blockScriptRequests);
-
 
 const rateLimit = require('express-rate-limit');
 const limiter = rateLimit({
@@ -108,8 +97,6 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-
-// Swagger Setup
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
@@ -130,15 +117,14 @@ const swaggerOptions = {
   },
   security: [
     {
-      bearerAuth: [], // Apply globally to all endpoints
+      bearerAuth: [],
     },
   ],
-  apis: ['./src/routes/*.js', './src/routes/**/*.js', './src/controllers/*.js'],  // Add the controllers path here
+  apis: ['./src/routes/*.js', './src/routes/**/*.js', './src/controllers/*.js'],
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
-// Set up EJS as the template engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
@@ -152,7 +138,9 @@ const patientRoutes = require('./routes/patientRoutes');
 const wifiCSIRoutes = require('./routes/wifiCSI');
 const activityRecognitionRoutes = require('./routes/activityRecognition');
 const alertsRoutes = require('./routes/alerts');
+const notificationRoutes = require('./routes/notifications');
 const patientLogRoutes = require('./routes/patientLogRoutes');
+
 
 app.use('/api/v1/auth', userRoutes);
 app.use('/api/v1/caretaker', caretakerRoutes);
@@ -161,7 +149,9 @@ app.use('/api/v1/patients', patientRoutes);
 app.use('/api/v1/wifi-csi', wifiCSIRoutes);
 app.use('/api/v1/activity-recognition', activityRecognitionRoutes);
 app.use('/api/v1/alerts', alertsRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/patient-logs', patientLogRoutes);
+
 
 app.use(
   '/swaggerDocs',
@@ -183,11 +173,10 @@ app.get('/redoc', (req, res) => {
     <html>
       <head>
         <title>Guardian Monitor APIs</title>
-        <!-- Include the Redoc script -->
         <script src="https://cdn.jsdelivr.net/npm/redoc@latest/bundles/redoc.standalone.js"></script>
       </head>
       <body>
-        <redoc spec-url="/openapi.json"></redoc> <!-- Specify OpenAPI spec URL -->
+        <redoc spec-url="/openapi.json"></redoc>
         <script>
           Redoc.init('/openapi.json', {}, document.querySelector('redoc'));
         </script>
@@ -228,7 +217,7 @@ app.get('/', (req, res) => {
           margin-top: 20px;
         }
         .button {
-          background-color: #4CAF50; /* Green */
+          background-color: #4CAF50;
           border: none;
           color: white;
           padding: 15px 32px;
@@ -259,12 +248,41 @@ app.get('/', (req, res) => {
   `);
 });
 
+const server = http.createServer(app);
+const io = socketIO(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
+const connectedUsers = Object.create(null);
+
+io.on('connection', socket => {
+  socket.on('register', userId => {
+    if (!userId) return;
+    connectedUsers[String(userId)] = socket.id;
+  });
+  socket.on('disconnect', () => {
+    for (const [uid, sid] of Object.entries(connectedUsers)) {
+      if (sid === socket.id) {
+        delete connectedUsers[uid];
+        break;
+      }
+    }
+  });
+});
+
+function emitToUser(userId, event, payload) {
+  const sid = connectedUsers[String(userId)];
+  if (sid) io.to(sid).emit(event, payload);
+}
+setEmit(emitToUser);
+
+
 const PORT = process.env.PORT || 3000;
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
 }
+
+app.emitToUser = emitToUser;
+app.server = server;
 
 module.exports = app;
