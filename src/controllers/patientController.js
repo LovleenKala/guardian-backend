@@ -216,25 +216,49 @@ exports.getPatientDetails = async (req, res) => {
  *         description: Server error
  */
 exports.assignNurseToPatient = async (req, res) => {
-  const { nurseId, patientId } = req.body;
-
   try {
+    const { nurseId, patientId } = req.body;
+
     const patient = await Patient.findById(patientId);
-    const nurse = await User.findById(nurseId);
+    const nurse = await User.findById(nurseId).populate('role');
 
-    if (!patient || !nurse) return res.status(404).json({ error: 'Invalid nurse or patient ID' });
+    if (!patient || !nurse) {
+      return res.status(404).json({ error: 'Invalid nurse or patient ID' });
+    }
 
-    patient.assignedNurses = patient.assignedNurses || [];
+    // Ensure the selected user is a nurse
+    if (!nurse.role || nurse.role.name !== 'nurse') {
+      return res.status(400).json({ error: 'Selected user is not a nurse' });
+    }
+
     if (!patient.assignedNurses.includes(nurseId)) {
       patient.assignedNurses.push(nurseId);
       await patient.save();
     }
 
-    res.status(200).json({ message: 'Nurse assigned to patient successfully' });
+    if (!nurse.assignedPatients.includes(patientId)) {
+      nurse.assignedPatients.push(patientId);
+      await nurse.save();
+    }
+
+    res.status(200).json({
+      message: 'Nurse assigned to patient successfully',
+      patient: {
+        id: patient._id,
+        fullname: patient.fullname,
+        assignedNurses: patient.assignedNurses
+      },
+      nurse: {
+        id: nurse._id,
+        fullname: nurse.fullname,
+        assignedPatients: nurse.assignedPatients
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error assigning nurse to patient', details: error.message });
   }
 };
+
 
 /**
  * @swagger
