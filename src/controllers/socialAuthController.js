@@ -2,56 +2,49 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Role = require('../models/Role');
+const crypto = require('crypto');
 
-/**
- * Handles unified login flow for Facebook/Google social logins.
- * @param {{
- *   provider: 'facebook'|'google',
- *   providerId: string,
- *   email: string,
- *   name?: string,
- *   avatar?: string
- * }} payload
- *
- * Rules:
- *  - Check only by email to determine if user is new or existing
- *  - Existing user:
- *      - Bind provider if not already bound
- *      - Do not modify existing role
- *      - Issue JWT
- *  - New user:
- *      - Create new user with role = null
- *      - Issue JWT
- *      - The frontend should detect `role=null` and redirect user to a "choose role" screen
- */
-exports.handleSocialLogin = async (payload) => {
+// helper: generate refresh token
+function genRTK() {
+  return crypto.randomBytes(32).toString('hex');        
+}
+// helper: hash refresh token with SHA-256
+function hashRTK(rt) {
+  return crypto.createHash('sha256').update(rt).digest('hex'); 
+}
+
+/* ---------- Social Login Handler ---------- */
+// payload = { provider, providerId, email, name?, avatar? }
+// flow:
+// - find user by email
+// - if new: create user (role = null)
+// - if existing: bind provider if missing, keep role unchanged
+// - issue access token (15m)
+// - generate + store refresh token (7d cookie)
+exports.handleSocialLogin = async (payload, res) => {
   const { provider, providerId, email, name } = payload;
-
-  if (!email) {
-    throw new Error('Social provider did not return an email address.');
-  }
+  if (!email) throw new Error('Social provider did not return an email address.');
 
   const normEmail = String(email).trim().toLowerCase();
 
-  // 1) Find user by email
+  // find existing user
   let user = await User.findOne({ email: normEmail });
-
   if (!user) {
-    // 2) New user: create account with role = null, provider info recorded
-    const providerPatch = {};
+    // new user → create with role = null
+    const providerPatch = {}; 
     providerPatch[provider] = { id: providerId, linkedAt: new Date() };
-
     user = await User.create({
       fullname: name || 'Social User',
       email: normEmail,
-      password_hash: undefined,   // Social accounts don’t need password
+      password_hash: undefined,
       passwordSet: false,
-      role: null,                 // ★ Important: default to null (user must choose role later)
+      role: null,       // must choose later
       providers: [provider],
       ...providerPatch,
+      refreshTokens: [],
     });
   } else {
-    // 3) Existing user: bind provider if not already bound; keep existing role unchanged
+    // existing user → add provider if not bound
     const providers = Array.isArray(user.providers) ? user.providers : [];
     const needAddProvider = !providers.includes(provider);
     const needBind = !user[provider] || !user[provider].id;
@@ -64,58 +57,64 @@ exports.handleSocialLogin = async (payload) => {
     }
   }
 
-  if (!process.env.JWT_SECRET) {
-    throw new Error('JWT_SECRET is not set');
-  }
+  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not set');
 
-  // 4) Issue JWT with minimal payload
-  //    role may still be null → frontend can check and redirect to “choose role”
-  const token = jwt.sign(
-    {
-      _id: user._id.toString(),
-      email: user.email || null,
-      role: user.role ? user.role.toString() : null,
-    },
+  // issue access token (15m)
+  const accessToken = jwt.sign(
+    { _id: user._id.toString(), email: user.email || null, role: user.role ? user.role.toString() : null },
     process.env.JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: '15m' }
   );
 
-  return { action: 'login', user, token };
+  // generate + store refresh token
+  const plainRTK = genRTK();
+  const hashedRTK = hashRTK(plainRTK);
+  user.refreshTokens = Array.from(new Set([...(user.refreshTokens || []), hashedRTK]));
+  if (user.refreshTokens.length > 3) {
+    user.refreshTokens = user.refreshTokens.slice(-3);
+  }
+  await user.save();
+
+  // set RTK cookie (7d)
+  if (res) {
+    const secure = process.env.NODE_ENV === 'production';
+    res.cookie('rt', plainRTK, {
+      httpOnly: true, sameSite: 'lax', secure, path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+  }
+
+  return { action: 'login', user, token: accessToken };
 };
 
-/**
- * Endpoint: POST /auth/set-role
- * Body: { roleName: 'nurse' | 'caretaker' | 'admin' }
- *
- * Flow:
- *  - Requires a valid Bearer JWT
- *  - If user exists and roleName is valid, update user.role
- *  - Return a new JWT with the updated role included in payload
- */
+/* ---------- Set User Role ---------- */
+// endpoint: POST /auth/set-role
+// body: { roleName: 'nurse' | 'caretaker' | 'admin' }
+// flow:
+// - require JWT (decoded user in req.user)
+// - validate roleName
+// - update user.role
+// - issue new access token (24h) with updated role
 exports.setUserRole = async (req, res) => {
   try {
     const { roleName } = req.body;
     if (!roleName) return res.status(400).json({ error: 'roleName is required' });
 
-    // Find role by name in DB
+    // find role in DB
     const role = await Role.findOne({ name: roleName.toLowerCase() });
     if (!role) return res.status(400).json({ error: 'Invalid roleName' });
 
-    // Fetch current user from decoded JWT
+    // find user from JWT
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Update role
+    // update role
     user.role = role._id;
     await user.save();
 
-    // Issue new JWT with updated role
+    // issue new access token (24h)
     const newToken = jwt.sign(
-      {
-        _id: user._id.toString(),
-        email: user.email || null,
-        role: user.role.toString(),
-      },
+      { _id: user._id.toString(), email: user.email || null, role: user.role.toString() },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );

@@ -31,7 +31,8 @@ const UserSchema = new mongoose.Schema({
   providers: [{ type: String, enum: ['local', 'facebook', 'google'] }],
   facebook:  ProviderSub,
   google:    ProviderSub,
-
+  refreshTokens: { type: [String], default: [] },
+  
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });
