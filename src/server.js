@@ -140,7 +140,7 @@ const activityRecognitionRoutes = require('./routes/activityRecognition');
 const alertsRoutes = require('./routes/alerts');
 const notificationRoutes = require('./routes/notifications');
 const patientLogRoutes = require('./routes/patientLogRoutes');
-
+const doctorRoutes = require('./routes/doctor');
 
 app.use('/api/v1/auth', userRoutes);
 app.use('/api/v1/caretaker', caretakerRoutes);
@@ -151,7 +151,7 @@ app.use('/api/v1/activity-recognition', activityRecognitionRoutes);
 app.use('/api/v1/alerts', alertsRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/patient-logs', patientLogRoutes);
-
+app.use('/api/v1/doctors', doctorRoutes);
 
 app.use(
   '/swaggerDocs',
