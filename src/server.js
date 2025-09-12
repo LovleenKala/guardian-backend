@@ -11,6 +11,11 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const { setEmit } = require('../socket');
 
+// Import Passport.js library, a middleware for authentication strategies 
+// (Facebook, Google, local login, JWT, etc.)
+const passport = require('passport');
+
+
 const app = express();
 
 const storage = multer.diskStorage({
@@ -131,6 +136,13 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Initialize Passport middleware so that authentication strategies 
+// (e.g., Facebook, Google) are hooked into the Express app
+app.use(passport.initialize());
+
+const cookieParser = require('cookie-parser');
+app.use(cookieParser());  
+
 const userRoutes = require('./routes/user');
 const caretakerRoutes = require('./routes/caretakerRoutes');
 const nurseRoutes = require('./routes/nurseRoutes');
@@ -144,6 +156,12 @@ const doctorRoutes = require('./routes/doctor');
 const adminRoutes = require('./routes/admin');
 
 
+// Import social authentication routes (Facebook, Google, set-role endpoint)
+// These routes handle OAuth login callbacks and user role setup
+const socialAuthRoutes = require('./routes/socialAuth');
+
+
+
 app.use('/api/v1/auth', userRoutes);
 app.use('/api/v1/caretaker', caretakerRoutes);
 app.use('/api/v1/nurse', nurseRoutes);
@@ -155,6 +173,16 @@ app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/patient-logs', patientLogRoutes);
 app.use('/api/v1/doctors', doctorRoutes);
 app.use('/api/v1/admin', adminRoutes);
+
+// Mount all social authentication routes under /auth
+// Example endpoints now available:
+//   GET  /auth/facebook           → Start Facebook login
+//   GET  /auth/facebook/callback  → Handle Facebook callback
+//   GET  /auth/google             → Start Google login
+//   GET  /auth/google/callback    → Handle Google callback
+//   POST /auth/set-role           → Set role after first social login
+app.use('/auth', socialAuthRoutes);
+
 
 app.use(
   '/swaggerDocs',
