@@ -10,6 +10,8 @@ const PatientSchema = new mongoose.Schema({
 
   caretaker: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Single caretaker assigned
 
+  doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
   assignedNurses: [
     { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   ],
@@ -31,6 +33,13 @@ PatientSchema.pre('save', async function (next) {
       const invalidUsers = nurses.filter(u => !u.role || u.role.name !== 'nurse');
       if (invalidUsers.length > 0) {
         return next(new Error('All assigned nurses must have the role "nurse".'));
+      }
+    }
+    // Validate doctor (if set) has role 'doctor'
+    if (this.doctor) {
+      const doctorUser = await User.findById(this.doctor).populate('role');
+      if (!doctorUser || !doctorUser.role || doctorUser.role.name !== 'doctor') {
+        return next(new Error('The assigned doctor must have the role "doctor".'));
       }
     }
 
