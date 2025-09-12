@@ -142,46 +142,56 @@ exports.deletePatient = async (req, res) => {
 
 /**
  * @swagger
- * /api/v1/patient/{patientId}:
+ * /api/v1/patients/{patientId}:
  *   get:
- *     summary: Fetch patient details
+ *     summary: Fetch patient details by ID
  *     tags: [Patient]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - patientId
- *             properties:
- *               patientId:
- *                 type: string
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ObjectId of the patient
  *     responses:
  *       200:
  *         description: Patient details
  *       404:
  *         description: Patient not found
  *       400:
- *         description: Error fetching patient details
+ *         description: Invalid patient id or error fetching details
  */
 exports.getPatientDetails = async (req, res) => {
   try {
-    const patient = await Patient.findById(req.body.patientId)
-      .populate('caretaker', 'fullname email')
-      .populate('assignedNurses', 'fullname email');
+    const { patientId } = req.params;
 
-    if (!patient) return res.status(404).json({ message: 'Patient not found' });
-
-    const patientObj = patient.toObject(); // Convert Mongoose document to plain object
-
-    if (patientObj.dateOfBirth) {
-      patientObj.age = calculateAge(patientObj.dateOfBirth); // Dynamically add age
+    let patient;
+    try {
+      patient = await Patient.findOne({ _id: patientId, isDeleted: { $ne: true } })
+        .populate('caretaker', 'fullname email')
+        .populate('assignedNurses', 'fullname email');
+    } catch (e) {
+      if (e.name === 'CastError') {
+        return res.status(400).json({ message: 'Invalid patient id' });
+      }
+      throw e;
     }
 
-    res.json(patientObj);
+    if (!patient) {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+
+    const patientObj = patient.toObject();
+
+    if (patientObj.dateOfBirth) {
+      patientObj.age = calculateAge(patientObj.dateOfBirth);
+    }
+
+    return res.json(patientObj);
   } catch (error) {
-    res.status(400).json({ message: 'Error fetching patient information', details: error.message });
+    return res.status(400).json({ message: 'Error fetching patient information', details: error.message });
   }
 };
 

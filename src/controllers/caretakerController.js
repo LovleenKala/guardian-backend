@@ -87,20 +87,20 @@ exports.getProfile = async (req, res) => {
  *         schema:
  *           type: string
  *           enum: [dueDate, -dueDate, created_at, -created_at]
- *         description: Sort results (default: dueDate ascending)
+ *         description: "Sort results (default: dueDate ascending)"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: Page number for pagination (default: 1)
+ *         description: "Page number for pagination (default: 1)"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           minimum: 1
  *           maximum: 100
- *         description: Page size (default: 20)
+ *         description: "Page size (default: 20)"
  *     responses:
  *       200:
  *         description: List of tasks
