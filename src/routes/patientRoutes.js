@@ -7,18 +7,28 @@ const verifyToken = require('../middleware/verifyToken');
 const verifyRole = require('../middleware/verifyRole');
 const upload = require('../middleware/multer');
 
+
+router.post(
+    '/add',
+    verifyToken,
+    verifyRole(['caretaker']),
+    upload.single('photo'),
+    patientController.addPatient
+  );
+router.delete('/:patientId', verifyToken, patientController.deletePatient);
+
 // Patients
 router.post('/add', verifyToken, upload.single('profilePhoto'), patientController.addPatient);
 router.delete('/:patientId', verifyToken, patientController.deletePatient);
 
 // Assignments
+
 router.post('/assign-nurse', verifyToken, verifyRole(['caretaker']), patientController.assignNurseToPatient);
 router.post(
   '/:patientId/assign-doctor',
   verifyToken,
   verifyRole(['admin', 'caretaker']),
-  doctorController.assignDoctorToPatient
-);
+  doctorController.assignDoctorToPatient);
 
 // Queries 
 router.get('/assigned-patients', verifyToken, patientController.getAssignedPatients);
