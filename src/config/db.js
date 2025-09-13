@@ -1,4 +1,4 @@
-require('dotenv').config();
+// require('dotenv').config();
 const mongoose = require('mongoose');
 const seedRoles = require('../seedRoles');
 const seedData = require('../seedData');
@@ -29,3 +29,4 @@ const connectDB = async () => {
 
 connectDB();
 module.exports = mongoose;
+
