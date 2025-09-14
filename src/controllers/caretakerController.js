@@ -57,6 +57,77 @@ exports.getProfile = async (req, res) => {
 
 /**
  * @swagger
+ * /api/v1/caretaker/profile:
+ *   put:
+ *     summary: Update caretaker profile
+ *     tags: [Caretaker]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [caretakerId]
+ *             properties:
+ *               caretakerId:
+ *                 type: string
+ *                 description: The ID of the caretaker
+ *               fullname:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               gender:
+ *                 type: string
+ *               age:
+ *                 type: number
+ *               email:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Caretaker profile updated successfully
+ *       400:
+ *         description: Invalid request
+ *       404:
+ *         description: Caretaker not found
+ *       500:
+ *         description: Server error
+ */
+exports.updateProfile = async (req, res) => {
+  try {
+    const { caretakerId, ...updates } = req.body;
+
+    if (!caretakerId) {
+      return res.status(400).json({ error: 'Missing caretakerId' });
+    }
+
+    const updatedCaretaker = await User.findByIdAndUpdate(
+      caretakerId,
+      { $set: updates },
+      { new: true, runValidators: true, context: 'query' }
+    )
+      .select('-password_hash -__v')
+      .populate('role', 'name')
+      .populate('assignedPatients', 'fullname age gender');
+
+    if (!updatedCaretaker) {
+      return res.status(404).json({ error: 'Caretaker not found' });
+    }
+
+    res.status(200).json({
+      message: 'Caretaker profile updated successfully',
+      profile: updatedCaretaker,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error updating profile', details: error.message });
+  }
+};
+
+/**
+ * @swagger
  * /api/v1/caretaker/tasks:
  *   get:
  *     summary: List caretaker tasks with optional filters
