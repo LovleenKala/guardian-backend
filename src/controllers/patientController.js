@@ -72,6 +72,124 @@ exports.addPatient = async (req, res) => {
   }
 };
 
+// --- Controller addition ---
+
+/**
+ * @swagger
+ * /api/v1/patients/{patientId}:
+ *   put:
+ *     summary: Update patient details
+ *     description: Update one or more fields of an existing patient. Accepts JSON or multipart/form-data when uploading a new profile photo.
+ *     tags: [Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ObjectId of the patient
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fullname: { type: string }
+ *               dateOfBirth:
+ *                 type: string
+ *                 format: date
+ *                 example: '1980-01-01'
+ *               gender: { type: string }
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fullname: { type: string }
+ *               dateOfBirth:
+ *                 type: string
+ *                 format: date
+ *                 example: '1980-01-01'
+ *               gender: { type: string }
+ *               profilePhoto:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Patient updated successfully
+ *       400:
+ *         description: Invalid patient id or bad input
+ *       404:
+ *         description: Patient not found
+ *       410:
+ *         description: Patient is deleted and cannot be updated
+ *       500:
+ *         description: Server error
+ */
+exports.updatePatient = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    // Load existing (and not soft-deleted) patient
+    let patient;
+    try {
+      patient = await Patient.findById(patientId);
+    } catch (e) {
+      if (e.name === 'CastError') {
+        return res.status(400).json({ message: 'Invalid patient id' });
+      }
+      throw e;
+    }
+
+    if (!patient) {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+    if (patient.isDeleted) {
+      return res.status(410).json({ message: 'Patient is deleted and cannot be updated' });
+    }
+
+    // Accept JSON or multipart/form-data; profilePhoto may come via req.file
+    const { fullname, dateOfBirth, gender } = req.body;
+
+    if (typeof fullname !== 'undefined' && fullname !== patient.fullname) {
+      patient.fullname = fullname;
+    }
+    if (typeof gender !== 'undefined' && gender !== patient.gender) {
+      patient.gender = gender;
+    }
+
+    if (typeof dateOfBirth !== 'undefined') {
+      const d = new Date(dateOfBirth);
+      if (isNaN(d.getTime())) {
+        return res.status(400).json({ message: 'Invalid dateOfBirth; expected YYYY-MM-DD' });
+      }
+      patient.dateOfBirth = d;
+    }
+
+    if (req.file && req.file.filename) {
+      patient.profilePhoto = req.file.filename;
+      // (Optional) TODO: remove older photo file from storage if needed
+    }
+
+    // Track updater (optional)
+    if (req.user && req.user._id) {
+      patient.updatedBy = req.user._id;
+    }
+
+    await patient.save();
+
+    const obj = patient.toObject();
+    if (obj.dateOfBirth) {
+      obj.age = calculateAge(obj.dateOfBirth);
+    }
+
+    return res.status(200).json({ message: 'Patient updated successfully', patient: obj });
+  } catch (err) {
+    return res.status(500).json({ message: 'Error updating patient', details: err.message });
+  }
+};
 /**
  * @swagger
  * /api/v1/patients/{patientId}:
