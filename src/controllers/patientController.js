@@ -72,7 +72,117 @@ exports.addPatient = async (req, res) => {
   }
 };
 
-// --- Controller addition ---
+/**
+ * @swagger
+ * /api/v1/patients:
+ *   get:
+ *     summary: Get all patients (excluding soft-deleted by default)
+ *     tags: [Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *         description: Page number (1-indexed)
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+ *         description: Page size (max 100)
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Case-insensitive match on fullname
+ *       - in: query
+ *         name: gender
+ *         schema: { type: string, enum: [male, female, other] }
+ *         description: Filter by gender
+ *       - in: query
+ *         name: caretakerId
+ *         schema: { type: string }
+ *         description: Filter by caretaker ObjectId
+ *       - in: query
+ *         name: includeDeleted
+ *         schema: { type: boolean, default: false }
+ *         description: Include soft-deleted records if true
+ *       - in: query
+ *         name: sort
+ *         schema: { type: string, default: "-created_at" }
+ *         description: Mongoose-style sort (e.g. "-created_at", "fullname")
+ *     responses:
+ *       200:
+ *         description: Paged list of patients
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 page: { type: integer }
+ *                 limit: { type: integer }
+ *                 total: { type: integer }
+ *                 totalPages: { type: integer }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Patient'
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Server error
+ */
+exports.getAllPatients = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+    const skip = (page - 1) * limit;
+
+    const { search, gender, caretakerId, includeDeleted, sort = '-created_at' } = req.query;
+
+    const filter = {};
+    // Soft-delete handling
+    if (!(String(includeDeleted).toLowerCase() === 'true')) {
+      filter.isDeleted = { $ne: true };
+    }
+
+    if (search) {
+      filter.fullname = { $regex: search, $options: 'i' };
+    }
+    if (gender) {
+      filter.gender = gender;
+    }
+    if (caretakerId) {
+      filter.caretaker = caretakerId;
+    }
+
+    const [total, patients] = await Promise.all([
+      Patient.countDocuments(filter),
+      Patient.find(filter)
+        .populate('caretaker', 'fullname email')
+        .populate('assignedNurses', 'fullname email')
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+    ]);
+
+    // Add computed age to each item (non-destructive)
+    const data = patients.map(p => {
+      const obj = p.toObject();
+      if (obj.dateOfBirth) obj.age = calculateAge(obj.dateOfBirth);
+      return obj;
+    });
+
+    return res.status(200).json({
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Error fetching patients', details: err.message });
+  }
+};
+
 
 /**
  * @swagger

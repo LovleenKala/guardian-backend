@@ -21,6 +21,7 @@ router.delete('/:patientId', verifyToken, patientController.deletePatient);
 router.post('/add', verifyToken, upload.single('profilePhoto'), patientController.addPatient);
 router.delete('/:patientId', verifyToken, patientController.deletePatient);
 router.put('/:patientId', verifyToken, upload.single('profilePhoto'), patientController.updatePatient);
+router.get('/', verifyToken, patientController.getAllPatients);
 
 // Assignments
 

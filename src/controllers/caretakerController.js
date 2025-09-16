@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const Task = require('../models/Task');
+const Role = require('../models/Role');
+
 
 
 /**
@@ -254,5 +256,80 @@ exports.getTasks = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ error: 'Error fetching tasks', details: error.message });
+  }
+};
+/**
+ * @swagger
+ * /api/v1/caretaker:
+ *   get:
+ *     summary: Get all caretakers
+ *     tags: [Caretaker]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, minimum: 1, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - in: query
+ *         name: email
+ *         schema: { type: string }
+ *       - in: query
+ *         name: sort
+ *         schema: { type: string, default: "-created_at" }
+ *     responses:
+ *       200:
+ *         description: Paged list of caretakers
+ *       500:
+ *         description: Server error
+ */
+
+exports.getAllCaretakers = async (req, res) => {
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+    const skip = (page - 1) * limit;
+
+    const { search, email, sort = '-created_at' } = req.query;
+
+    const role = await Role.findOne({ name: 'caretaker' });
+    if (!role) {
+      return res.status(500).json({ message: 'Caretaker role not found in DB' });
+    }
+
+    const filter = { role: role._id };
+
+    if (search) {
+      filter.fullname = { $regex: search, $options: 'i' };
+    }
+    if (email) {
+      filter.email = { $regex: email, $options: 'i' };
+    }
+
+    const [total, caretakers] = await Promise.all([
+      User.countDocuments(filter),
+      User.find(filter)
+        .select('-password_hash -__v')
+        .populate('role', 'name')
+        .populate('assignedPatients', 'fullname gender dateOfBirth')
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+    ]);
+
+    return res.status(200).json({
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data: caretakers
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Error fetching caretakers', details: err.message });
   }
 };
