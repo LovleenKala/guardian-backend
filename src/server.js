@@ -142,6 +142,9 @@ const notificationRoutes = require('./routes/notifications');
 const patientLogRoutes = require('./routes/patientLogRoutes');
 const doctorRoutes = require('./routes/doctor');
 const adminRoutes = require('./routes/admin');
+const adminStaffRoutes = require('./routes/adminStaffRoutes');
+const adminPatientRoutes = require('./routes/adminPatientRoutes');
+const orgRoutes = require('./routes/orgRoutes');
 
 
 app.use('/api/v1/auth', userRoutes);
@@ -155,6 +158,9 @@ app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/patient-logs', patientLogRoutes);
 app.use('/api/v1/doctors', doctorRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/admin', adminStaffRoutes);
+app.use('/api/v1/admin', adminPatientRoutes);
+app.use('/api/v1', orgRoutes);
 
 app.use(
   '/swaggerDocs',
