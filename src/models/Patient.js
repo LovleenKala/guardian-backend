@@ -49,11 +49,15 @@ const PatientSchema = new Schema(
       required: true,
       immutable: true,
     },
-
     // basic patient info
     fullname: { type: String, required: true, trim: true, index: true },
     gender: { type: String, required: true, enum: ['M', 'F', 'other'], set: normalizeGender },
     dateOfBirth: { type: Date, required: true },
+  doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
+  assignedNurses: [
+    { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  ],
 
     // org link (and cached name)
     organization: {
@@ -178,6 +182,13 @@ PatientSchema.pre('save', async function preSave(next) {
             if (invalid.length) throw new Error('All assigned nurses must have the role "nurse".');
           })
       );
+    }
+    // Validate doctor (if set) has role 'doctor'
+    if (this.doctor) {
+      const doctorUser = await User.findById(this.doctor).populate('role');
+      if (!doctorUser || !doctorUser.role || doctorUser.role.name !== 'doctor') {
+        return next(new Error('The assigned doctor must have the role "doctor".'));
+      }
     }
 
     // doctor must have doctor role
