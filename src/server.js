@@ -103,7 +103,7 @@ const swaggerOptions = {
     info: {
       title: 'Guardian API',
       version: '1.0.0',
-      description: 'API documentation with Swagger UI and Redoc'
+      description: 'API documentation with Swagger UI and Redoc',
     },
     components: {
       securitySchemes: {
@@ -116,12 +116,13 @@ const swaggerOptions = {
     },
     security: [
       {
-        bearerAuth: [], // Apply globally to all endpoints
+        bearerAuth: [],
       },
     ],
   },
   apis: ['./src/routes/*.js', './src/routes/**/*.js', './src/controllers/*.js'],
 };
+
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
@@ -156,6 +157,9 @@ app.use('/api/v1/patient-logs', patientLogRoutes);
 app.use('/api/v1/doctors', doctorRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/prescriptions', prescriptionRoutes);
+app.use('/api/v1/admin', adminStaffRoutes);
+app.use('/api/v1/admin', adminPatientRoutes);
+app.use('/api/v1/orgs', orgRoutes);
 
 app.use(
   '/swaggerDocs',
