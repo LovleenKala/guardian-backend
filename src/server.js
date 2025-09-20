@@ -142,7 +142,7 @@ const notificationRoutes = require('./routes/notifications');
 const patientLogRoutes = require('./routes/patientLogRoutes');
 const doctorRoutes = require('./routes/doctor');
 const adminRoutes = require('./routes/admin');
-
+const prescriptionRoutes = require('./routes/prescriptionRoutes');
 
 app.use('/api/v1/auth', userRoutes);
 app.use('/api/v1/caretaker', caretakerRoutes);
@@ -155,6 +155,7 @@ app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/patient-logs', patientLogRoutes);
 app.use('/api/v1/doctors', doctorRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/prescriptions', prescriptionRoutes);
 
 app.use(
   '/swaggerDocs',
