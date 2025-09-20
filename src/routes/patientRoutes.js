@@ -6,6 +6,7 @@ const doctorController = require('../controllers/doctorController');
 const verifyToken = require('../middleware/verifyToken');
 const verifyRole = require('../middleware/verifyRole');
 const upload = require('../middleware/multer');
+const prescriptionController = require('../controllers/prescriptionController');
 
 
 router.post(
@@ -42,5 +43,8 @@ router.get('/:patientId', verifyToken, patientController.getPatientDetails);
 // Activities
 router.post('/entryreport', verifyToken, verifyRole(['nurse']), patientController.logEntry);
 router.delete('/entryreport/:entryId', verifyToken, patientController.deleteEntry);
+
+// List prescriptions for a patient (sub-resource)
+router.get('/:patientId/prescriptions',verifyToken,prescriptionController.listPrescriptionsForPatient);
 
 module.exports = router;
