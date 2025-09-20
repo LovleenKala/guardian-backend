@@ -183,7 +183,6 @@ async function ensureStaffBoundToOrg(userDoc, orgDoc) {
  */
 exports.createPatient = async (req, res) => {
   try {
-    // sanity check → don’t allow client to send org
     if (req.body && typeof req.body === 'object' && 'organization' in req.body) {
       delete req.body.organization;
     }
