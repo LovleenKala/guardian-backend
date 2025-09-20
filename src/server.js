@@ -143,6 +143,8 @@ const notificationRoutes = require('./routes/notifications');
 const patientLogRoutes = require('./routes/patientLogRoutes');
 const doctorRoutes = require('./routes/doctor');
 const adminRoutes = require('./routes/admin');
+const adminPatientRoutes = require('./routes/adminPatientRoutes');
+const adminStaffRoutes = require('./routes/adminStaffRoutes');
 const prescriptionRoutes = require('./routes/prescriptionRoutes');
 
 app.use('/api/v1/auth', userRoutes);
